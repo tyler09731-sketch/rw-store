@@ -163,7 +163,8 @@ export default function Storefront() {
 
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input type="text" placeholder="Search bank, description, balance..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-xl shadow-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm" />
+          {/* FIXED: Placeholder changed to include BIN */}
+          <input type="text" placeholder="Search bank, BIN, balance..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-xl shadow-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm" />
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
@@ -227,7 +228,8 @@ export default function Storefront() {
           
           {/* Table Wrapper: z-0 so it stays below the sticky header */}
           <div className="overflow-x-auto w-full pb-20 relative z-0">
-            <table className="w-full relative text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+            {/* FIXED: Added min-w-[800px] to force overflow so sticky works */}
+            <table className="w-full min-w-[800px] relative text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
                 <tr>
                   {ccColumns.map((col) => (
@@ -270,8 +272,8 @@ export default function Storefront() {
                     ))}
                     <td className="p-3 text-sm font-bold whitespace-nowrap text-orange-600">${p.price_usd.toFixed(2)}</td>
                     
-                    {/* Sticky Buy Button: z-10 to stay below header but above table cells */}
-                    <td className="p-3 text-right sticky right-0 z-10 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                    {/* FIXED: Sticky Buy Button with proper z-index and shadow */}
+                    <td className="p-3 text-right sticky right-0 z-10 bg-white shadow-[-8px_0_10px_rgba(0,0,0,0.05)]">
                       <button onClick={() => { haptic.medium(); setSelectedProduct(p); }} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-transform">Buy</button>
                     </td>
                   </motion.tr>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Search, RotateCw, Package, ChevronRight } from 'lucide-react'
+import { Search, RotateCw, Package, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { getFlagEmoji } from '@/lib/getFlag'
 import { haptic } from '@/lib/haptics'
@@ -33,14 +33,17 @@ export default function Storefront() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('items')
   const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string, balance?: number } | null>(null)
+  const [orderCount, setOrderCount] = useState(0)
 
   const fetchData = async () => {
     setLoading(true)
     const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).order('created_at', { ascending: false })
     const { data: schms } = await supabase.from('category_schemas').select('*')
+    const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'confirmed')
     
     if (prods) setProducts(prods)
     if (schms) setSchemas(schms)
+    if (count) setOrderCount(count)
     setLoading(false)
   }
 
@@ -93,9 +96,17 @@ export default function Storefront() {
             <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm">RW</div>
             <h1 className="font-bold text-xl tracking-tight">Store 2.0</h1>
           </div>
-          <button onClick={() => { haptic.light(); fetchData(); }} className="p-2.5 bg-white rounded-full shadow-sm border border-gray-100 active:scale-95 transition-transform">
-            <RotateCw size={18} className="text-gray-600" />
-          </button>
+          <div className="flex items-center gap-2">
+            {orderCount > 0 && (
+              <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-full shadow-sm border border-gray-100 text-xs font-medium">
+                <CheckCircle2 size={12} className="text-green-500" />
+                {orderCount} delivered
+              </div>
+            )}
+            <button onClick={() => { haptic.light(); fetchData(); }} className="p-2.5 bg-white rounded-full shadow-sm border border-gray-100 active:scale-95 transition-transform">
+              <RotateCw size={18} className="text-gray-600" />
+            </button>
+          </div>
         </div>
 
         <div className="relative mb-4">
@@ -117,7 +128,6 @@ export default function Storefront() {
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-20 text-gray-500">No products found.</div>
       ) : isTableView ? (
-        /* TABLE VIEW (For CCs) */
         <div className="px-4 pt-2 overflow-x-auto">
           <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
@@ -159,7 +169,6 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
-        /* CARD VIEW (For Banks) */
         <div className="px-4 pt-2 space-y-3">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (

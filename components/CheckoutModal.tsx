@@ -25,6 +25,27 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
     return () => clearInterval(timer)
   }, [step])
 
+  // Native Telegram back button handling
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    if (!tg?.BackButton) return
+
+    if (step !== 'select') {
+      tg.BackButton.show()
+      tg.BackButton.onClick(() => {
+        haptic.light()
+        if (step === 'pay') setStep('select')
+        if (step === 'hash') setStep('pay')
+      })
+    } else {
+      tg.BackButton.hide()
+    }
+
+    return () => {
+      tg.BackButton.offClick()
+    }
+  }, [step])
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
@@ -46,6 +67,8 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
 
   const handleClose = () => {
     haptic.light()
+    const tg = (window as any).Telegram?.WebApp
+    tg?.BackButton?.hide()
     onClose()
   }
 
@@ -72,7 +95,6 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
           onClick={(e) => e.stopPropagation()}
           className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10"
         >
-          {/* Header with Back Arrow */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               {step !== 'select' && (
@@ -89,7 +111,6 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
             </button>
           </div>
 
-          {/* STEP 1: SELECT COIN */}
           {step === 'select' && (
             <div className="space-y-3">
               <p className="text-sm text-gray-500 mb-4">Choose your preferred network.</p>
@@ -123,7 +144,6 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
             </div>
           )}
 
-          {/* STEP 2: PAY */}
           {step === 'pay' && (
             <div className="space-y-4">
               <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex items-center justify-between border border-orange-100">
@@ -152,7 +172,6 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
             </div>
           )}
 
-          {/* STEP 3: HASH */}
           {step === 'hash' && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">Paste your Transaction Hash (TXID) below.</p>

@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           strategy="beforeInteractive" 
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="h-[100dvh] flex flex-col">{children}</body>
     </html>
   );
 }

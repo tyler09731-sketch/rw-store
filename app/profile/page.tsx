@@ -31,7 +31,6 @@ export default function ProfilePage({
 
       <div className="px-4 pt-4 space-y-4">
         
-        {/* User Card */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 overflow-hidden">
              {user?.photo_url ? (
@@ -46,7 +45,6 @@ export default function ProfilePage({
           </div>
         </div>
 
-        {/* Quick Links */}
         <div>
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Quick Actions</p>
           <div className="grid grid-cols-2 gap-3">
@@ -61,7 +59,6 @@ export default function ProfilePage({
           </div>
         </div>
 
-        {/* Support Links */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <a href="https://t.me/your_support_username" target="_blank" className="flex items-center gap-3 p-4 border-b border-gray-50 active:bg-gray-50">
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
@@ -94,7 +91,6 @@ export default function ProfilePage({
           </a>
         </div>
 
-        {/* App Info / Log Out */}
         <div className="text-center pt-4">
           <p className="text-xs text-gray-400 mb-2">RW Store v2.0</p>
           <button 

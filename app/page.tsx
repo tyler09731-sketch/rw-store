@@ -80,16 +80,18 @@ export default function Storefront() {
   const categories = ['All', 'Banks', 'CC Info']
   const isTableView = activeCategory === 'CC Info'
 
-  // EXACT columns to show in the table (State is excluded)
-  const ccColumns = ['BIN', 'Exp', 'Country', 'Bank', 'Level', 'Network', 'Address', 'Email']
-  
-  // Fields to use as filters
-  const ccFilters = ['Country', 'Bank', 'Level', 'Network']
+  // Balance is back in the columns
+  const ccColumns = ['BIN', 'Exp', 'Country', 'State', 'Bank', 'Level', 'Network', 'Balance', 'Address', 'Email']
+  const ccFilters = ['Country', 'State', 'Bank', 'Level', 'Network']
 
-  // Helper to format expiry: "05/2027" -> "05/27"
   const formatExp = (exp: string) => {
     if (!exp) return '-'
     return exp.replace(/20(\d{2})/, '$1')
+  }
+
+  const formatBalance = (bal: string) => {
+    if (!bal) return '-'
+    return bal.includes('$') ? bal : `$${bal}`
   }
 
   const getFilterOptions = (fieldName: string) => {
@@ -223,7 +225,7 @@ export default function Storefront() {
           </div>
           
           <div className="overflow-x-auto w-full pb-20">
-            <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+            <table className="w-full relative text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
                 <tr>
                   {ccColumns.map((col) => (
@@ -251,8 +253,9 @@ export default function Storefront() {
                           </div>
                         ) : col === 'Exp' ? (
                           <span className="block">{formatExp(p.metadata[col])}</span>
+                        ) : col === 'Balance' ? (
+                          <span className="block text-green-600 font-bold">{formatBalance(p.metadata[col])}</span>
                         ) : col === 'Address' || col === 'Email' ? (
-                          // Render Yes/No as badges
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
                             p.metadata[col] === 'Yes' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'
                           }`}>
@@ -263,8 +266,8 @@ export default function Storefront() {
                         )}
                       </td>
                     ))}
-                    <td className="p-3 text-sm font-bold whitespace-nowrap">${p.price_usd}</td>
-                    <td className="p-3 text-right sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                    <td className="p-3 text-sm font-bold whitespace-nowrap text-orange-600">${p.price_usd.toFixed(2)}</td>
+                    <td className="p-3 text-right sticky right-0 z-10 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                       <button onClick={() => { haptic.medium(); setSelectedProduct(p); }} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-transform">Buy</button>
                     </td>
                   </motion.tr>
@@ -304,7 +307,7 @@ export default function Storefront() {
 
                 <div className="my-3">
                   <p className="text-green-600 font-extrabold text-2xl tracking-tight">
-                    {product.metadata.Balance ? product.metadata.Balance : 'Digital Item'}
+                    {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
                   </p>
                   {product.metadata.Description && <p className="text-xs font-medium text-gray-500 mt-1">{product.metadata.Description}</p>}
                   

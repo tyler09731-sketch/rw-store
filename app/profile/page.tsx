@@ -2,7 +2,7 @@
 
 import { User, Send, BookOpen, ShieldQuestion, ArrowLeft } from 'lucide-react'
 
-export default function ProfilePage({ onBack }: { onBack: () => void }) {
+export default function ProfilePage({ user, onBack }: { user: any, onBack: () => void }) {
   return (
     <div className="min-h-screen bg-gray-50 pb-24 font-sans">
       <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-4 border-b border-gray-100 flex items-center gap-3">
@@ -16,12 +16,16 @@ export default function ProfilePage({ onBack }: { onBack: () => void }) {
         
         {/* User Card */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-          <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-500">
-            <User size={28} />
+          <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 overflow-hidden">
+             {user?.photo_url ? (
+                <img src={user.photo_url} alt="Profile" className="w-full h-full object-cover" />
+             ) : (
+                <User size={28} />
+             )}
           </div>
           <div>
-            <h2 className="font-bold text-lg">Telegram User</h2>
-            <p className="text-sm text-gray-500">@username</p>
+            <h2 className="font-bold text-lg">{user ? user.first_name : 'Loading...'}</h2>
+            <p className="text-sm text-gray-500">{user?.username ? `@${user.username}` : 'Telegram User'}</p>
           </div>
         </div>
 

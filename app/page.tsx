@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Star, Package } from 'lucide-react'
+import { retrieveLaunchParams } from '@telegram-apps/sdk'
 import CheckoutModal from '@/components/CheckoutModal'
 import BottomNav from '@/components/BottomNav'
 import OrdersPage from './orders/page'
@@ -28,9 +29,11 @@ export default function Storefront() {
   const [categories, setCategories] = useState<string[]>(['All'])
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   
-  // Navigation State
+  // Navigation & User State
   const [activeTab, setActiveTab] = useState<Tab>('items')
+  const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string } | null>(null)
 
+  // Fetch products from Supabase
   const fetchProducts = async () => {
     setLoading(true)
     const { data } = await supabase
@@ -51,6 +54,40 @@ export default function Storefront() {
     fetchProducts()
   }, [])
 
+  // Telegram Auth & Registration
+  useEffect(() => {
+    const initTelegram = async () => {
+      try {
+        const { initDataRaw } = retrieveLaunchParams()
+        
+        if (initDataRaw) {
+          const res = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: initDataRaw })
+          })
+          
+          const data = await res.json()
+          
+          if (res.status === 403) {
+            alert('Your access has been revoked. Contact support.')
+            window.location.href = 'https://t.me/your_support_username'
+            return
+          }
+
+          if (data.success) {
+            setUser(data.user)
+          }
+        }
+      } catch (e) {
+        console.log('Not in Telegram or error:', e)
+      }
+    }
+    
+    initTelegram()
+  }, [])
+
+  // Filter logic
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) || 
                           p.balance_info.toLowerCase().includes(search.toLowerCase())
@@ -60,7 +97,7 @@ export default function Storefront() {
 
   // Handle Tab Switching
   if (activeTab === 'orders') return <><OrdersPage onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
-  if (activeTab === 'profile') return <><ProfilePage onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
+  if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
 
   // Default: Items Tab
   return (

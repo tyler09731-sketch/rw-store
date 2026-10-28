@@ -24,6 +24,9 @@ type Product = {
 
 type Tab = 'items' | 'orders' | 'wallet' | 'profile'
 
+// Fields we don't want to show in the main table (they're too long or handled elsewhere)
+const HIDDEN_FIELDS = ['Address', 'Email', 'Seller', 'Balance']
+
 export default function Storefront() {
   const [products, setProducts] = useState<Product[]>([])
   const [schemas, setSchemas] = useState<any[]>([])
@@ -82,34 +85,30 @@ export default function Storefront() {
   }, [activeCategory])
 
   const categories = ['All', 'Banks', 'CC Info']
-  
-  const activeSchema = schemas.find(s => 
-    s.category.toLowerCase().trim() === activeCategory.toLowerCase().trim()
-  )
-  
   const isTableView = activeCategory === 'CC Info'
 
-  // THE CLEAN FIX: Parse schema fields safely. No hardcoded fallbacks.
-  const schemaFields = useMemo(() => {
-    if (!activeSchema || !activeSchema.fields) return []
-    // If it's a string, parse it. If it's already an array, use it.
-    if (typeof activeSchema.fields === 'string') {
-      try {
-        return JSON.parse(activeSchema.fields)
-      } catch {
-        return []
-      }
-    }
-    return Array.isArray(activeSchema.fields) ? activeSchema.fields : []
-  }, [activeSchema])
+  // THE FIX: Derive columns from the actual products in the CC Info category
+  const tableColumns = useMemo(() => {
+    if (!isTableView) return []
+    
+    // Find the first CC product to use as the template
+    const firstCC = products.find(p => p.category === 'CC Info')
+    if (!firstCC || !firstCC.metadata) return []
+    
+    // Get all keys from the metadata, excluding the hidden ones
+    const keys = Object.keys(firstCC.metadata).filter(k => !HIDDEN_FIELDS.includes(k))
+    return keys.slice(0, 5) // Limit to 5 for mobile
+  }, [isTableView, products])
 
+  // Filters derive from the same column logic
   const filterableFields = useMemo(() => {
     if (!isTableView) return []
-    return schemaFields.filter((field: any) => {
-      if (['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(field.name)) return false
-      return true
-    })
-  }, [isTableView, schemaFields])
+    const firstCC = products.find(p => p.category === 'CC Info')
+    if (!firstCC || !firstCC.metadata) return []
+    return Object.keys(firstCC.metadata).filter(k => 
+      !['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(k)
+    )
+  }, [isTableView, products])
 
   const getFilterOptions = (fieldName: string) => {
     const categoryProducts = products.filter(p => p.category === activeCategory)
@@ -197,23 +196,23 @@ export default function Storefront() {
               <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
             </div>
             
-            {filterableFields.map((field: any) => (
-              <div key={field.name} className="relative shrink-0">
+            {filterableFields.map((fieldName: string) => (
+              <div key={fieldName} className="relative shrink-0">
                 <select
-                  value={activeFilters[field.name] || ''}
-                  onChange={(e) => setFilter(field.name, e.target.value)}
+                  value={activeFilters[fieldName] || ''}
+                  onChange={(e) => setFilter(fieldName, e.target.value)}
                   className={`appearance-none px-3 py-1.5 pr-7 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                    activeFilters[field.name]
+                    activeFilters[fieldName]
                       ? 'bg-orange-500 text-white border-orange-500'
                       : 'bg-white text-gray-600 border-gray-200'
                   }`}
                 >
-                  <option value="">{field.name}</option>
-                  {getFilterOptions(field.name).map((opt: string) => (
+                  <option value="">{fieldName}</option>
+                  {getFilterOptions(fieldName).map((opt: string) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
-                <ChevronRight size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none ${activeFilters[field.name] ? 'text-white' : 'text-gray-400'}`} />
+                <ChevronRight size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none ${activeFilters[fieldName] ? 'text-white' : 'text-gray-400'}`} />
               </div>
             ))}
             
@@ -245,7 +244,10 @@ export default function Storefront() {
             <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
                 <tr>
-                  {schemaFields.slice(0, 5).map((f: any) => <th key={f.name} className="p-3 font-semibold whitespace-nowrap">{f.name}</th>)}
+                  {/* DYNAMIC COLUMNS from tableColumns */}
+                  {tableColumns.map((col) => (
+                    <th key={col} className="p-3 font-semibold whitespace-nowrap">{col}</th>
+                  ))}
                   <th className="p-3 font-semibold whitespace-nowrap">Price</th>
                   <th className="p-3 w-16"></th>
                 </tr>
@@ -259,15 +261,16 @@ export default function Storefront() {
                     transition={{ delay: index * 0.05 }}
                     className="hover:bg-gray-50/50"
                   >
-                    {schemaFields.slice(0, 5).map((f: any) => (
-                      <td key={f.name} className="p-3 text-sm whitespace-nowrap">
-                        {f.name === 'Country' ? (
+                    {/* DYNAMIC CELLS from tableColumns */}
+                    {tableColumns.map((col) => (
+                      <td key={col} className="p-3 text-sm whitespace-nowrap">
+                        {col === 'Country' ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-base leading-none">{getFlagEmoji(p.metadata.Country || 'US')}</span>
-                            <span className="font-medium">{p.metadata.Country === 'GB' ? 'UK' : p.metadata.Country}</span>
+                            <span className="text-base leading-none">{getFlagEmoji(p.metadata[col] || 'US')}</span>
+                            <span className="font-medium">{p.metadata[col] === 'GB' ? 'UK' : p.metadata[col]}</span>
                           </div>
                         ) : (
-                          <span className="truncate max-w-[100px] block">{p.metadata[f.name] || '-'}</span>
+                          <span className="block">{p.metadata[col] || '-'}</span>
                         )}
                       </td>
                     ))}

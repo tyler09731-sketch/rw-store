@@ -6,7 +6,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SECRET_KEY!
 )
 
-// GET: Fetch all data for the admin dashboard
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const password = searchParams.get('password')
@@ -28,7 +27,6 @@ export async function GET(req: Request) {
   })
 }
 
-// POST: Handle adding categories and products
 export async function POST(req: Request) {
   const body = await req.json()
   const { password, action, ...data } = body
@@ -41,7 +39,8 @@ export async function POST(req: Request) {
     const { error } = await supabaseAdmin.from('category_schemas').insert({
       category: data.category,
       fields: data.fields,
-      default_view: data.default_view
+      default_view: data.default_view,
+      has_image: data.has_image || false // Save the image toggle
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })
@@ -63,7 +62,6 @@ export async function POST(req: Request) {
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
 
-// DELETE: Remove a product
 export async function DELETE(req: Request) {
   const { searchParams } = new URL(req.url)
   const password = searchParams.get('password')

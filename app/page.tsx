@@ -35,7 +35,6 @@ export default function Storefront() {
     setLoading(true)
     const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).order('created_at', { ascending: false })
     const { data: schms } = await supabase.from('category_schemas').select('*')
-    
     if (prods) setProducts(prods)
     if (schms) setSchemas(schms)
     setLoading(false)
@@ -43,7 +42,6 @@ export default function Storefront() {
 
   useEffect(() => {
     fetchData()
-    
     const initTelegram = async () => {
       try {
         const tg = (window as any).Telegram?.WebApp
@@ -61,7 +59,6 @@ export default function Storefront() {
           setUser({ id: 0, first_name: 'Browser', username: 'test_user', balance: 0 })
         }
       } catch (e) {
-        console.log('Not in Telegram:', e)
         setUser({ id: 0, first_name: 'Browser', username: 'test_user', balance: 0 })
       }
     }
@@ -114,6 +111,7 @@ export default function Storefront() {
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-20 text-gray-500">No products found.</div>
       ) : isTableView ? (
+        /* TABLE VIEW */
         <div className="px-4 pt-2 overflow-x-auto">
           <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
@@ -149,6 +147,7 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
+        /* CARD VIEW */
         <div className="px-4 pt-2 space-y-3">
           {filteredProducts.map((product) => (
             <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col">

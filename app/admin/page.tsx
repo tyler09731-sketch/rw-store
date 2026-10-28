@@ -22,6 +22,7 @@ export default function AdminPage() {
   const [newCatName, setNewCatName] = useState('')
   const [newCatView, setNewCatView] = useState('card')
   const [newCatFields, setNewCatFields] = useState<string[]>([''])
+  const [newCatHasImage, setNewCatHasImage] = useState(false)
 
   // Product Form State
   const [prodTitle, setProdTitle] = useState('')
@@ -31,7 +32,7 @@ export default function AdminPage() {
   const [prodFields, setProdFields] = useState<Record<string, string>>({})
   const [selectedCountryCode, setSelectedCountryCode] = useState('')
 
-  // Geo Data (Using country-state-city)
+  // Geo Data
   const countries = Country.getAllCountries()
   const availableStates = selectedCountryCode ? State.getStatesOfCountry(selectedCountryCode) : []
   const hasStates = availableStates.length > 0
@@ -42,11 +43,11 @@ export default function AdminPage() {
     path: 'bank-logos',
     allowedMimeTypes: ['image/*'],
     maxFiles: 1,
-    maxFileSize: 1000 * 1000 * 5, // 5MB
+    maxFileSize: 1000 * 1000 * 5,
     upsert: true,
   })
 
-  // Auto-set image URL when upload succeeds
+  // Auto-set image URL
   useEffect(() => {
     if (uploadProps.isSuccess && uploadProps.successes.length > 0 && uploadProps.successes[0]) {
       const supabase = createClient()
@@ -55,9 +56,7 @@ export default function AdminPage() {
         .from('product-images')
         .getPublicUrl(`bank-logos/${fileName}`)
       
-      if (urlData?.publicUrl) {
-        setProdImage(urlData.publicUrl)
-      }
+      if (urlData?.publicUrl) setProdImage(urlData.publicUrl)
     }
   }, [uploadProps.isSuccess, uploadProps.successes])
 
@@ -84,44 +83,35 @@ export default function AdminPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        password, action: 'add_category', category: newCatName, fields, default_view: newCatView
+        password, action: 'add_category', category: newCatName, fields, default_view: newCatView, has_image: newCatHasImage
       })
     })
     setShowCatForm(false)
     setNewCatName('')
     setNewCatFields([''])
+    setNewCatHasImage(false)
     fetchData()
   }
 
   const handleAddProduct = async () => {
     const finalMetadata = { ...prodFields }
-    
-    if (selectedCountryCode) {
-      finalMetadata['Country'] = selectedCountryCode
-    }
+    if (selectedCountryCode) finalMetadata['Country'] = selectedCountryCode
 
     await fetch('/api/admin/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        password, 
-        action: 'add_product', 
-        title: prodTitle, 
-        category: prodCategory, 
-        price_usd: prodPrice, 
-        image_url: prodImage, 
-        metadata: finalMetadata
+        password, action: 'add_product', title: prodTitle, category: prodCategory, price_usd: prodPrice, image_url: prodImage, metadata: finalMetadata
       })
     })
     
-    // Reset form
     setShowProdForm(false)
     setProdTitle('')
     setProdPrice('')
     setProdImage('')
     setProdFields({})
     setSelectedCountryCode('')
-    uploadProps.setFiles([]) // Clear the dropzone
+    uploadProps.setFiles([])
     fetchData()
   }
 
@@ -179,10 +169,29 @@ export default function AdminPage() {
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-3">
             <h2 className="font-bold">New Category</h2>
             <input placeholder="Category Name (e.g. CC Info)" value={newCatName} onChange={e => setNewCatName(e.target.value)} className="w-full bg-gray-50 p-3 rounded-lg text-sm" />
-            <select value={newCatView} onChange={e => setNewCatView(e.target.value)} className="w-full bg-gray-50 p-3 rounded-lg text-sm">
+            
+            <select 
+              value={newCatView} 
+              onChange={e => {
+                const view = e.target.value
+                setNewCatView(view)
+                if (view === 'table' && newCatFields.length <= 1 && !newCatFields[0]) {
+                  setNewCatFields(['BIN', 'Exp', 'Country', 'State', 'Bank', 'Level', 'Network', 'Balance', 'Address', 'Email', 'Seller'])
+                } else if (view === 'card' && newCatFields.length > 5) {
+                  setNewCatFields([''])
+                }
+              }} 
+              className="w-full bg-gray-50 p-3 rounded-lg text-sm"
+            >
               <option value="card">Default View: Cards</option>
               <option value="table">Default View: Table</option>
             </select>
+
+            <label className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg cursor-pointer">
+              <input type="checkbox" checked={newCatHasImage} onChange={e => setNewCatHasImage(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+              <span className="text-sm font-medium">Enable Image Upload for this Category</span>
+            </label>
+
             <p className="text-xs font-semibold text-gray-500 uppercase mt-2">Fields</p>
             {newCatFields.map((f, i) => (
               <input key={i} placeholder="Field Name (e.g. BIN)" value={f} onChange={e => { const n = [...newCatFields]; n[i] = e.target.value; setNewCatFields(n) }} className="w-full bg-gray-50 p-3 rounded-lg text-sm mb-2" />
@@ -203,10 +212,10 @@ export default function AdminPage() {
             </select>
             <input placeholder="Price USD" type="number" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full bg-gray-50 p-3 rounded-lg text-sm" />
             
-            {/* Image Upload for Banks */}
-            {prodCategory === 'Banks' && (
+            {/* Image Upload (Dynamic based on Schema) */}
+            {selectedSchema?.has_image && (
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Bank Logo</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Product Image</p>
                 <Dropzone {...uploadProps}>
                   {uploadProps.isSuccess ? <DropzoneContent /> : <DropzoneEmptyState />}
                 </Dropzone>

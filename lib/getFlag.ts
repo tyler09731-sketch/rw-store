@@ -1,30 +1,32 @@
-const countryToIso: Record<string, string> = {
-  'united states': 'US', 'usa': 'US', 'canada': 'CA', 'united kingdom': 'GB', 'uk': 'GB',
-  'germany': 'DE', 'mexico': 'MX', 'switzerland': 'CH', 'sweden': 'SE', 'spain': 'ES',
-  'thailand': 'TH', 'uae': 'AE', 'india': 'IN', 'finland': 'FI', 'singapore': 'SG',
-  'france': 'FR', 'norway': 'NO', 'ireland': 'IE', 'belgium': 'BE', 'netherlands': 'NL',
-  'portugal': 'PT', 'czech republic': 'CZ', 'australia': 'AU', 'brazil': 'BR',
-  'austria': 'AT', 'poland': 'PL', 'japan': 'JP', 'italy': 'IT', 'south africa': 'ZA'
-}
+import { Country } from 'country-state-city'
 
 export function getFlagEmoji(countryName: string) {
   if (!countryName) return '🏳️'
   
-  // Clean the string, lowercase it, and remove weird characters
-  const normalized = countryName.trim().toLowerCase().replace(/[^a-z ]/g, '')
+  const cleanName = countryName.trim()
   
-  // Find the ISO code, or fallback to whatever they typed if it's already 2 letters
-  let isoCode = countryToIso[normalized] || normalized.toUpperCase()
-
-  if (isoCode.length === 2) {
-    try {
-      const codePoints = isoCode
-        .split('')
-        .map(char => 127397 + char.charCodeAt(0))
-      return String.fromCodePoint(...codePoints)
-    } catch {
-      return '🏳️'
-    }
+  // If it's already a 2-letter code (e.g. "US"), just convert to emoji
+  if (cleanName.length === 2) {
+    return String.fromCodePoint(...cleanName.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0)))
+  }
+  
+  // Find the country in the library by name
+  const country = Country.getAllCountries().find(
+    c => c.name.toLowerCase() === cleanName.toLowerCase()
+  )
+  
+  // If found, use its isoCode. If not, try a partial match.
+  let isoCode = country?.isoCode
+  if (!isoCode) {
+    const partialMatch = Country.getAllCountries().find(
+      c => cleanName.toLowerCase().includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(cleanName.toLowerCase())
+    )
+    isoCode = partialMatch?.isoCode
+  }
+  
+  // Convert ISO code to emoji
+  if (isoCode && isoCode.length === 2) {
+    return String.fromCodePoint(...isoCode.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0)))
   }
   
   return '🏳️'

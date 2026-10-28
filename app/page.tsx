@@ -75,19 +75,17 @@ export default function Storefront() {
   }, [activeCategory])
 
   const categories = ['All', ...new Set(products.map(p => p.category))]
+  
   const activeSchema = schemas.find(s => s.category === activeCategory)
   const isTableView = activeCategory !== 'All' && activeSchema?.default_view === 'table'
 
-  // FIXED: Allow Bank to be filterable, skip useless fields
   const filterableFields = useMemo(() => {
     if (!isTableView || !activeSchema || !activeSchema.fields) return []
     return activeSchema.fields.filter((field: any) => {
       if (['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(field.name)) return false
-      const categoryProducts = products.filter(p => p.category === activeCategory)
-      const values = new Set(categoryProducts.map(p => p.metadata[field.name]).filter(Boolean))
-      return values.size >= 1
+      return true
     })
-  }, [isTableView, activeSchema, products, activeCategory])
+  }, [isTableView, activeSchema])
 
   const getFilterOptions = (fieldName: string) => {
     const categoryProducts = products.filter(p => p.category === activeCategory)
@@ -99,6 +97,9 @@ export default function Storefront() {
     const searchString = `${p.title} ${JSON.stringify(p.metadata)}`.toLowerCase()
     const matchesSearch = searchString.includes(search.toLowerCase())
     const matchesCategory = activeCategory === 'All' || p.category === activeCategory
+    
+    if (!isTableView) return matchesSearch && matchesCategory
+
     const matchesFilters = Object.entries(activeFilters).every(([key, value]) => {
       if (!value) return true
       return p.metadata[key] === value
@@ -127,9 +128,9 @@ export default function Storefront() {
   if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} setActiveTab={setActiveTab} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
 
   return (
-    // FIX: Added overflow-x-hidden to prevent horizontal page scroll
-    <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900 overflow-x-hidden w-full relative">
-      <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-2">
+    // THE FIX: w-full max-w-full overflow-x-hidden
+    <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900 w-full max-w-full overflow-x-hidden relative">
+      <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-2 w-full max-w-full">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm">RW</div>
@@ -153,16 +154,18 @@ export default function Storefront() {
           <input type="text" placeholder="Search everything..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-xl shadow-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm" />
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {/* Category Tabs - clamped scroll */}
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
           {categories.map((cat) => (
-            <button key={cat} onClick={() => { haptic.light(); setActiveCategory(cat); }} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-white text-gray-600 border border-gray-100'}`}>
+            <button key={cat} onClick={() => { haptic.light(); setActiveCategory(cat); }} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${activeCategory === cat ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-white text-gray-600 border border-gray-100'}`}>
               {cat}
             </button>
           ))}
         </div>
 
-        {filterableFields.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1">
+        {/* Filters - clamped scroll */}
+        {isTableView && filterableFields.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1 w-full max-w-full">
             <div className="flex items-center gap-1 text-gray-500 mr-1 shrink-0">
               <SlidersHorizontal size={14} />
               <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
@@ -213,8 +216,8 @@ export default function Storefront() {
           )}
         </div>
       ) : isTableView ? (
-        // FIX: Table View - Wrap table in a div with overflow-x-auto and set min-width on table
-        <div className="px-4 pt-2 w-full overflow-x-auto">
+        // THE FIX: Table View - bounded scroll only inside this container
+        <div className="px-4 pt-2 w-full max-w-full overflow-x-auto">
           <table className="w-full min-w-[500px] text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
               <tr>
@@ -255,7 +258,8 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
-        <div className="px-4 pt-2 space-y-3">
+        // THE FIX: Card View - bounded width
+        <div className="px-4 pt-2 space-y-3 w-full max-w-full">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (
               <motion.div 

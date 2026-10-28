@@ -93,7 +93,6 @@ export default function Storefront() {
     return bal.includes('$') ? bal : `$${bal}`
   }
 
-  // NEW: Remove decimals from price
   const formatPrice = (price: number) => {
     return `$${Math.floor(price)}`
   }
@@ -139,7 +138,8 @@ export default function Storefront() {
     })
   }
 
-  if (activeTab === 'orders') return <><OrdersPage onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
+  // FIXED: Pass user to OrdersPage
+  if (activeTab === 'orders') return <><OrdersPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
   if (activeTab === 'wallet') return <><WalletPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
   if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} setActiveTab={setActiveTab} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
 
@@ -270,7 +270,6 @@ export default function Storefront() {
                         )}
                       </td>
                     ))}
-                    {/* FIXED: Using formatPrice to remove decimals */}
                     <td className="p-3 text-sm font-bold whitespace-nowrap text-orange-600">{formatPrice(p.price_usd)}</td>
                     
                     <td className="p-3 text-right sticky right-0 z-10 bg-white shadow-[-8px_0_10px_rgba(0,0,0,0.05)]">
@@ -331,7 +330,6 @@ export default function Storefront() {
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
                   <div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p>
-                    {/* FIXED: Using formatPrice in card view too */}
                     <p className="text-2xl font-extrabold text-gray-900">{formatPrice(product.price_usd)}</p>
                   </div>
                   <button onClick={() => { haptic.medium(); setSelectedProduct(product); }} className="bg-orange-500 text-white px-7 py-3 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2">

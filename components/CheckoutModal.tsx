@@ -76,7 +76,7 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
           {/* STEP 1: SELECT COIN */}
           {step === 'select' && (
             <div className="space-y-3">
-              <p className="text-sm text-gray-500 mb-4">Choose your preferred network. Ensure you send the exact amount.</p>
+              <p className="text-sm text-gray-500 mb-4">Choose your preferred network.</p>
               
               <button onClick={() => { haptic.light(); setSelectedCoin('USDT_TRC20'); setStep('pay'); }} className="w-full flex items-center justify-between p-4 border-2 border-orange-500 bg-orange-50 rounded-xl relative overflow-hidden">
                 <div className="flex items-center gap-3">
@@ -107,7 +107,7 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
             </div>
           )}
 
-          {/* STEP 2: SHOW ADDRESS */}
+          {/* STEP 2: PAY */}
           {step === 'pay' && (
             <div className="space-y-4">
               <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex items-center justify-between border border-orange-100">
@@ -136,13 +136,13 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
             </div>
           )}
 
-          {/* STEP 3: SUBMIT HASH */}
+          {/* STEP 3: HASH */}
           {step === 'hash' && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">Paste your Transaction Hash (TXID) below so we can verify and deliver your account instantly.</p>
+              <p className="text-sm text-gray-600">Paste your Transaction Hash (TXID) below.</p>
               <input 
                 type="text" 
-                placeholder="Paste transaction hash (0x... or abc...)" 
+                placeholder="Paste transaction hash..." 
                 className="w-full bg-gray-50 border border-gray-200 p-4 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
               />
               <button onClick={() => haptic.success()} className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 active:scale-95 transition-transform flex items-center justify-center gap-2">

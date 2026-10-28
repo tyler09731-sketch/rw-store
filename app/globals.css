@@ -24,3 +24,25 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Modal Slide Up Animation */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+/* Hide scrollbar for categories */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+/* Telegram Safe Area */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}

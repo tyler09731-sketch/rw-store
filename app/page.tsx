@@ -80,9 +80,17 @@ export default function Storefront() {
   const categories = ['All', 'Banks', 'CC Info']
   const isTableView = activeCategory === 'CC Info'
 
-  // HARDCODED CC COLUMNS (The exact keys we injected)
-  const ccColumns = ['BIN', 'Exp', 'Country', 'State', 'Bank', 'Level', 'Network']
-  const ccFilters = ['Country', 'State', 'Bank', 'Level', 'Network']
+  // EXACT columns to show in the table (State is excluded)
+  const ccColumns = ['BIN', 'Exp', 'Country', 'Bank', 'Level', 'Network', 'Address', 'Email']
+  
+  // Fields to use as filters
+  const ccFilters = ['Country', 'Bank', 'Level', 'Network']
+
+  // Helper to format expiry: "05/2027" -> "05/27"
+  const formatExp = (exp: string) => {
+    if (!exp) return '-'
+    return exp.replace(/20(\d{2})/, '$1')
+  }
 
   const getFilterOptions = (fieldName: string) => {
     const categoryProducts = products.filter(p => p.category === activeCategory)
@@ -241,8 +249,17 @@ export default function Storefront() {
                             <span className="text-base leading-none">{getFlagEmoji(p.metadata['Country'] || 'US')}</span>
                             <span className="font-medium">{p.metadata['Country'] === 'GB' ? 'UK' : p.metadata['Country']}</span>
                           </div>
+                        ) : col === 'Exp' ? (
+                          <span className="block">{formatExp(p.metadata[col])}</span>
+                        ) : col === 'Address' || col === 'Email' ? (
+                          // Render Yes/No as badges
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                            p.metadata[col] === 'Yes' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            {p.metadata[col] || '-'}
+                          </span>
                         ) : (
-                          <span className="block">{p.metadata[col] || '-'}</span>
+                          <span className="block max-w-[120px] truncate" title={String(p.metadata[col] || '')}>{p.metadata[col] || '-'}</span>
                         )}
                       </td>
                     ))}

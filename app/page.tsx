@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X } from 'lucide-react'
+import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X, SlidersHorizontal } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { getFlagEmoji } from '@/lib/getFlag'
 import { haptic } from '@/lib/haptics'
@@ -85,40 +85,31 @@ export default function Storefront() {
   const activeSchema = schemas.find(s => s.category === activeCategory)
   const isTableView = activeSchema?.default_view === 'table'
 
-  // Determine which fields should be filterable (only show fields that have distinct values)
+  // Filterable fields
   const filterableFields = useMemo(() => {
     if (!activeSchema || !activeSchema.fields) return []
-    
     return activeSchema.fields.filter((field: any) => {
-      // Skip fields that are not useful for filtering
       if (['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(field.name)) return false
-      
-      // Check if this field has at least 2 distinct values in current category products
       const categoryProducts = products.filter(p => p.category === activeCategory)
       const values = new Set(categoryProducts.map(p => p.metadata[field.name]).filter(Boolean))
       return values.size >= 1
     })
   }, [activeSchema, products, activeCategory])
 
-  // Get available options for each filterable field
   const getFilterOptions = (fieldName: string) => {
     const categoryProducts = products.filter(p => p.category === activeCategory)
     const values = Array.from(new Set(categoryProducts.map(p => p.metadata[fieldName]).filter(Boolean)))
     return values.sort()
   }
 
-  // Filter products based on search + active category + active dynamic filters
   const filteredProducts = products.filter(p => {
     const searchString = `${p.title} ${JSON.stringify(p.metadata)}`.toLowerCase()
     const matchesSearch = searchString.includes(search.toLowerCase())
     const matchesCategory = activeCategory === 'All' || p.category === activeCategory
-    
-    // Check all active dynamic filters
     const matchesFilters = Object.entries(activeFilters).every(([key, value]) => {
       if (!value) return true
       return p.metadata[key] === value
     })
-    
     return matchesSearch && matchesCategory && matchesFilters
   })
 
@@ -133,11 +124,7 @@ export default function Storefront() {
     haptic.light()
     setActiveFilters(prev => {
       const next = { ...prev }
-      if (value === '') {
-        delete next[fieldName]
-      } else {
-        next[fieldName] = value
-      }
+      if (value === '') { delete next[fieldName] } else { next[fieldName] = value }
       return next
     })
   }
@@ -180,9 +167,14 @@ export default function Storefront() {
           ))}
         </div>
 
-        {/* Dynamic Filters Row */}
+        {/* Horizontal Dynamic Filters */}
         {isTableView && filterableFields.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1">
+            <div className="flex items-center gap-1 text-gray-500 mr-1">
+              <SlidersHorizontal size={14} />
+              <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
+            </div>
+            
             {filterableFields.map((field: any) => (
               <div key={field.name} className="relative">
                 <select
@@ -270,6 +262,7 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
+        /* PREMIUM CARD VIEW */
         <div className="px-4 pt-2 space-y-3">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (
@@ -279,38 +272,50 @@ export default function Storefront() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2, delay: index * 0.05 }}
-                className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col"
+                className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col"
               >
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
                     {product.image_url ? (
-                      <img src={product.image_url} alt={product.title} className="w-10 h-10 rounded-lg object-cover bg-gray-50" />
+                      <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
                     ) : (
-                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-500"><Package size={20} /></div>
+                      <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
                     )}
                     <div>
-                      <h3 className="font-bold text-gray-900">{product.title}</h3>
-                      <p className="text-xs text-gray-500">{product.category}</p>
+                      <h3 className="font-bold text-base text-gray-900 leading-tight">{product.title}</h3>
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">
+                        {product.category}
+                      </span>
                     </div>
                   </div>
                   <ChevronRight className="text-gray-300" size={20} />
                 </div>
 
-                <div className="mt-2 mb-4">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Details</p>
-                  <p className="text-green-600 font-bold text-lg leading-tight">
-                    {product.metadata.Balance ? `Balance: ${product.metadata.Balance}` : 'Digital Item'}
+                <div className="my-3">
+                  <p className="text-green-600 font-extrabold text-2xl tracking-tight">
+                    {product.metadata.Balance ? `$${product.metadata.Balance}` : 'Digital Item'}
                   </p>
-                  {product.metadata.Description && <p className="text-xs text-gray-500 mt-1">{product.metadata.Description}</p>}
+                  {product.metadata.Description && <p className="text-xs font-medium text-gray-500 mt-1">{product.metadata.Description}</p>}
+                  
+                  {/* Sleek Badges replacing ugly text */}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {Object.entries(product.metadata)
+                      .filter(([key]) => ['Level', 'Network', 'Bank'].includes(key))
+                      .map(([key, value]: [string, any]) => (
+                        <span key={key} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md">
+                          {value}
+                        </span>
+                      ))}
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
                   <div>
-                    <p className="text-xs text-gray-400 font-medium">Price</p>
-                    <p className="text-xl font-bold text-gray-900">${product.price_usd.toFixed(2)}</p>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p>
+                    <p className="text-2xl font-extrabold text-gray-900">${product.price_usd.toFixed(2)}</p>
                   </div>
-                  <button onClick={() => { haptic.medium(); setSelectedProduct(product); }} className="bg-orange-500 text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-orange-500/30 active:scale-95 transition-transform flex items-center gap-2">
-                    <Package size={16} /> Buy
+                  <button onClick={() => { haptic.medium(); setSelectedProduct(product); }} className="bg-orange-500 text-white px-7 py-3 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2">
+                    <Package size={16} /> Buy Now
                   </button>
                 </div>
               </motion.div>

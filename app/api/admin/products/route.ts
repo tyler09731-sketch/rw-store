@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       category: data.category,
       fields: data.fields,
       default_view: data.default_view,
-      has_image: data.has_image || false // Save the image toggle
+      has_image: data.has_image || false
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })
@@ -60,6 +60,42 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+}
+
+// Handle Editing a Product (PUT)
+export async function PUT(req: Request) {
+  const body = await req.json()
+  const { password, id, ...data } = body
+
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { error } = await supabaseAdmin.from('products').update({
+    title: data.title,
+    category: data.category,
+    price_usd: parseFloat(data.price_usd),
+    image_url: data.image_url || null,
+    metadata: data.metadata || {}
+  }).eq('id', id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
+
+// Handle Toggling Sold Status (PATCH)
+export async function PATCH(req: Request) {
+  const body = await req.json()
+  const { password, id, is_sold } = body
+
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { error } = await supabaseAdmin.from('products').update({ is_sold }).eq('id', id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
 }
 
 export async function DELETE(req: Request) {

@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  reactCompiler: true, // This is the magic line
   experimental: {
     agentFeedback: true,
   },

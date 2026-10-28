@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle } from 'lucide-react'
+import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, XCircle } from 'lucide-react'
 import { Country, State } from 'country-state-city'
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/dropzone'
 import { useSupabaseUpload } from '@/hooks/use-supabase-upload'
 import { createClient } from '@/lib/supabase/client'
+
+const CARD_LEVELS = ['Standard', 'Silver', 'Gold', 'Platinum', 'Titanium', 'Signature', 'Infinite', 'World Elite', 'Business']
+const CARD_NETWORKS = ['Visa', 'Mastercard', 'Amex', 'Discover', 'JCB', 'UnionPay']
 
 export default function AdminPage() {
   const [password, setPassword] = useState('')
@@ -25,6 +28,7 @@ export default function AdminPage() {
   const [newCatHasImage, setNewCatHasImage] = useState(false)
 
   // Product Form State
+  const [editId, setEditId] = useState<number | null>(null) // If not null, we are editing
   const [prodTitle, setProdTitle] = useState('')
   const [prodCategory, setProdCategory] = useState('')
   const [prodPrice, setProdPrice] = useState('')
@@ -47,15 +51,11 @@ export default function AdminPage() {
     upsert: true,
   })
 
-  // Auto-set image URL
   useEffect(() => {
     if (uploadProps.isSuccess && uploadProps.successes.length > 0 && uploadProps.successes[0]) {
       const supabase = createClient()
       const fileName = uploadProps.successes[0]
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(`bank-logos/${fileName}`)
-      
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(`bank-logos/${fileName}`)
       if (urlData?.publicUrl) setProdImage(urlData.publicUrl)
     }
   }, [uploadProps.isSuccess, uploadProps.successes])
@@ -77,6 +77,78 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  const resetForm = () => {
+    setEditId(null)
+    setProdTitle('')
+    setProdPrice('')
+    setProdImage('')
+    setProdFields({})
+    setSelectedCountryCode('')
+    setShowProdForm(false)
+    uploadProps.setFiles([])
+  }
+
+  const handleEditClick = (product: any) => {
+    setEditId(product.id)
+    setProdTitle(product.title)
+    setProdCategory(product.category)
+    setProdPrice(product.price_usd.toString())
+    setProdImage(product.image_url || '')
+    setProdFields(product.metadata || {})
+    setSelectedCountryCode(product.metadata?.Country || '')
+    setShowProdForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleSaveProduct = async () => {
+    const finalMetadata = { ...prodFields }
+    if (selectedCountryCode) finalMetadata['Country'] = selectedCountryCode
+
+    const payload = {
+      password, 
+      title: prodTitle, 
+      category: prodCategory, 
+      price_usd: prodPrice, 
+      image_url: prodImage, 
+      metadata: finalMetadata
+    }
+
+    if (editId) {
+      // UPDATE
+      await fetch('/api/admin/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, id: editId })
+      })
+    } else {
+      // CREATE
+      await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, action: 'add_product' })
+      })
+    }
+    
+    resetForm()
+    fetchData()
+  }
+
+  const handleToggleSold = async (id: number, currentStatus: boolean) => {
+    await fetch('/api/admin/products', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, id, is_sold: !currentStatus })
+    })
+    fetchData()
+  }
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Delete this product?')) {
+      await fetch(`/api/admin/products?password=${password}&id=${id}`, { method: 'DELETE' })
+      fetchData()
+    }
+  }
+
   const handleAddCategory = async () => {
     const fields = newCatFields.filter(f => f.trim() !== '').map(f => ({ name: f, type: 'text' }))
     await fetch('/api/admin/products', {
@@ -91,35 +163,6 @@ export default function AdminPage() {
     setNewCatFields([''])
     setNewCatHasImage(false)
     fetchData()
-  }
-
-  const handleAddProduct = async () => {
-    const finalMetadata = { ...prodFields }
-    if (selectedCountryCode) finalMetadata['Country'] = selectedCountryCode
-
-    await fetch('/api/admin/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        password, action: 'add_product', title: prodTitle, category: prodCategory, price_usd: prodPrice, image_url: prodImage, metadata: finalMetadata
-      })
-    })
-    
-    setShowProdForm(false)
-    setProdTitle('')
-    setProdPrice('')
-    setProdImage('')
-    setProdFields({})
-    setSelectedCountryCode('')
-    uploadProps.setFiles([])
-    fetchData()
-  }
-
-  const handleDelete = async (id: number) => {
-    if (confirm('Delete this product?')) {
-      await fetch(`/api/admin/products?password=${password}&id=${id}`, { method: 'DELETE' })
-      fetchData()
-    }
   }
 
   const selectedSchema = data?.schemas.find((s: any) => s.category === prodCategory)
@@ -150,11 +193,10 @@ export default function AdminPage() {
           <div className="flex items-center gap-3"><ShieldAlert className="text-orange-500" size={28} /><h1 className="text-2xl font-bold text-gray-900">Admin</h1></div>
           <div className="flex gap-2">
             <button onClick={() => setShowCatForm(!showCatForm)} className="flex items-center gap-1.5 text-sm font-semibold bg-gray-900 text-white px-3 py-2 rounded-lg"><Layers size={16} /> Add Category</button>
-            <button onClick={() => setShowProdForm(!showProdForm)} className="flex items-center gap-1.5 text-sm font-semibold bg-orange-500 text-white px-3 py-2 rounded-lg"><Plus size={16} /> Add Product</button>
+            <button onClick={() => { resetForm(); setShowProdForm(!showProdForm); }} className="flex items-center gap-1.5 text-sm font-semibold bg-orange-500 text-white px-3 py-2 rounded-lg"><Plus size={16} /> Add Product</button>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
             <Users className="text-blue-500" /><div><p className="text-sm text-gray-500">Users</p><p className="text-2xl font-bold">{data.userCount}</p></div>
@@ -170,9 +212,7 @@ export default function AdminPage() {
             <h2 className="font-bold">New Category</h2>
             <input placeholder="Category Name (e.g. CC Info)" value={newCatName} onChange={e => setNewCatName(e.target.value)} className="w-full bg-gray-50 p-3 rounded-lg text-sm" />
             
-            <select 
-              value={newCatView} 
-              onChange={e => {
+            <select value={newCatView} onChange={e => {
                 const view = e.target.value
                 setNewCatView(view)
                 if (view === 'table' && newCatFields.length <= 1 && !newCatFields[0]) {
@@ -180,48 +220,50 @@ export default function AdminPage() {
                 } else if (view === 'card' && newCatFields.length > 5) {
                   setNewCatFields([''])
                 }
-              }} 
-              className="w-full bg-gray-50 p-3 rounded-lg text-sm"
-            >
+              }} className="w-full bg-gray-50 p-3 rounded-lg text-sm">
               <option value="card">Default View: Cards</option>
               <option value="table">Default View: Table</option>
             </select>
 
             <label className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg cursor-pointer">
               <input type="checkbox" checked={newCatHasImage} onChange={e => setNewCatHasImage(e.target.checked)} className="w-4 h-4 accent-orange-500" />
-              <span className="text-sm font-medium">Enable Image Upload for this Category</span>
+              <span className="text-sm font-medium">Enable Image Upload</span>
             </label>
 
             <p className="text-xs font-semibold text-gray-500 uppercase mt-2">Fields</p>
             {newCatFields.map((f, i) => (
-              <input key={i} placeholder="Field Name (e.g. BIN)" value={f} onChange={e => { const n = [...newCatFields]; n[i] = e.target.value; setNewCatFields(n) }} className="w-full bg-gray-50 p-3 rounded-lg text-sm mb-2" />
+              <input key={i} placeholder="Field Name" value={f} onChange={e => { const n = [...newCatFields]; n[i] = e.target.value; setNewCatFields(n) }} className="w-full bg-gray-50 p-3 rounded-lg text-sm mb-2" />
             ))}
             <button onClick={() => setNewCatFields([...newCatFields, ''])} className="text-orange-500 text-sm font-semibold">+ Add Field</button>
             <button onClick={handleAddCategory} className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold mt-2">Save Category</button>
           </div>
         )}
 
-        {/* Add Product Form */}
+        {/* Add/Edit Product Form */}
         {showProdForm && (
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-3">
-            <h2 className="font-bold">New Product</h2>
+          <div className={`bg-white p-5 rounded-2xl shadow-sm border-2 ${editId ? 'border-orange-500' : 'border-gray-100'} space-y-3`}>
+            <div className="flex justify-between items-center">
+              <h2 className="font-bold">{editId ? 'Edit Product' : 'New Product'}</h2>
+              {editId && <button onClick={resetForm} className="text-xs text-red-500 font-semibold">Cancel Edit</button>}
+            </div>
+            
             <input placeholder="Title (e.g. Chase Log)" value={prodTitle} onChange={e => setProdTitle(e.target.value)} className="w-full bg-gray-50 p-3 rounded-lg text-sm" />
-            <select value={prodCategory} onChange={e => {setProdCategory(e.target.value); setProdFields({}); setSelectedCountryCode('')}} className="w-full bg-gray-50 p-3 rounded-lg text-sm">
+            
+            <select value={prodCategory} onChange={e => {setProdCategory(e.target.value); if (!editId) setProdFields({}); setSelectedCountryCode('')}} disabled={!!editId} className="w-full bg-gray-50 p-3 rounded-lg text-sm disabled:opacity-50">
               <option value="">Select Category</option>
               {data.schemas.map((s: any) => <option key={s.category} value={s.category}>{s.category}</option>)}
             </select>
+            
             <input placeholder="Price USD" type="number" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full bg-gray-50 p-3 rounded-lg text-sm" />
             
-            {/* Image Upload (Dynamic based on Schema) */}
+            {/* Image Upload */}
             {selectedSchema?.has_image && (
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Product Image</p>
+                {prodImage && <img src={prodImage} alt="Preview" className="w-16 h-16 rounded-lg object-cover mb-2" />}
                 <Dropzone {...uploadProps}>
                   {uploadProps.isSuccess ? <DropzoneContent /> : <DropzoneEmptyState />}
                 </Dropzone>
-                {uploadProps.isSuccess && (
-                   <p className="text-xs text-green-500 mt-2 flex items-center gap-1"><CheckCircle size={12}/> Image ready</p>
-                )}
               </div>
             )}
 
@@ -242,7 +284,23 @@ export default function AdminPage() {
                 return (
                   <select key={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-sm">
                     <option value="">Select State</option>
-                    {availableStates.map((s: any) => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
+                    {availableStates.map((s: any) => <option key={s.isoCode} value={s.isoCode}>{s.name} ({s.isoCode})</option>)}
+                  </select>
+                )
+              }
+              if (field.name === 'Level') {
+                return (
+                  <select key={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-sm">
+                    <option value="">Select Level</option>
+                    {CARD_LEVELS.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                  </select>
+                )
+              }
+              if (field.name === 'Network') {
+                return (
+                  <select key={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-sm">
+                    <option value="">Select Network</option>
+                    {CARD_NETWORKS.map(net => <option key={net} value={net}>{net}</option>)}
                   </select>
                 )
               }
@@ -251,18 +309,29 @@ export default function AdminPage() {
               )
             })}
             
-            <button onClick={handleAddProduct} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2">Save Product</button>
+            <button onClick={handleSaveProduct} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2">
+              {editId ? 'Update Product' : 'Save Product'}
+            </button>
           </div>
         )}
 
         {/* Inventory List */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-50 bg-gray-50/50"><h2 className="font-bold">Inventory ({data.products.length})</h2></div>
-          <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+          <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
             {data.products.map((p: any) => (
-              <div key={p.id} className="p-4 flex items-center justify-between">
-                <div><p className="font-semibold text-sm">{p.title} <span className="text-xs font-normal text-gray-400">({p.category})</span></p><p className="text-xs text-gray-500">${p.price_usd}</p></div>
-                <button onClick={() => handleDelete(p.id)} className="text-red-400 p-2 bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+              <div key={p.id} className={`p-4 flex items-center justify-between ${p.is_sold ? 'bg-gray-100/50 opacity-60' : ''}`}>
+                <div>
+                  <p className="font-semibold text-sm">{p.title} <span className="text-xs font-normal text-gray-400">({p.category})</span></p>
+                  <p className="text-xs text-gray-500">${p.price_usd} {p.is_sold && <span className="text-red-500 font-bold ml-2">SOLD</span>}</p>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => handleToggleSold(p.id, p.is_sold)} className={`p-2 rounded-lg ${p.is_sold ? 'text-orange-500 bg-orange-50' : 'text-gray-400 bg-gray-50'}`} title={p.is_sold ? 'Mark as Available' : 'Mark as Sold'}>
+                    {p.is_sold ? <XCircle size={16} /> : <CheckCircle size={16} />}
+                  </button>
+                  <button onClick={() => handleEditClick(p)} className="text-blue-500 p-2 bg-blue-50 rounded-lg"><Pencil size={16} /></button>
+                  <button onClick={() => handleDelete(p.id)} className="text-red-400 p-2 bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                </div>
               </div>
             ))}
           </div>

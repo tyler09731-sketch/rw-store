@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Copy, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { X, Copy, CheckCircle2, ShieldCheck, ChevronLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { haptic } from '@/lib/haptics'
 
@@ -49,6 +49,12 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
     onClose()
   }
 
+  const handleBack = () => {
+    haptic.light()
+    if (step === 'pay') setStep('select')
+    if (step === 'hash') setStep('pay')
+  }
+
   return (
     <AnimatePresence>
       <motion.div 
@@ -66,8 +72,18 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
           onClick={(e) => e.stopPropagation()}
           className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10"
         >
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">{step === 'select' ? 'Select Payment' : 'Complete Payment'}</h2>
+          {/* Header with Back Arrow */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              {step !== 'select' && (
+                <button onClick={handleBack} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full">
+                  <ChevronLeft size={20} />
+                </button>
+              )}
+              <h2 className="text-xl font-bold">
+                {step === 'select' ? 'Select Payment' : step === 'pay' ? 'Complete Payment' : 'Confirm Payment'}
+              </h2>
+            </div>
             <button onClick={handleClose} className="p-2 bg-gray-100 rounded-full text-gray-500">
               <X size={20} />
             </button>
@@ -118,15 +134,7 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
               <div className="text-center py-4">
                 <p className="text-sm text-gray-500 mb-1">Send exactly</p>
                 <p className="text-2xl font-bold text-gray-900">{product.price_usd.toFixed(2)} USD</p>
-                <div className="flex items-center justify-center gap-2 mt-1">
-                  <p className="text-sm font-medium text-orange-500">in {selectedCoin.replace('_', ' ')}</p>
-                  <button 
-                    onClick={() => { haptic.light(); setStep('select'); }}
-                    className="text-xs font-semibold text-gray-400 underline"
-                  >
-                    Change
-                  </button>
-                </div>
+                <p className="text-sm font-medium text-orange-500 mt-1">in {selectedCoin.replace('_', ' ')}</p>
               </div>
 
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">

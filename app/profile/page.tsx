@@ -1,6 +1,6 @@
 'use client'
 
-import { User, Send, BookOpen, ShieldQuestion, ArrowLeft, Package, Wallet, LogOut, ShieldCheck } from 'lucide-react'
+import { User, Send, BookOpen, ShieldQuestion, ArrowLeft, Package, Wallet, LogOut } from 'lucide-react'
 import { haptic } from '@/lib/haptics'
 
 type Tab = 'items' | 'orders' | 'wallet' | 'profile'
@@ -44,15 +44,6 @@ export default function ProfilePage({
             <h2 className="font-bold text-lg">{user ? user.first_name : 'Loading...'}</h2>
             <p className="text-sm text-gray-500">{user?.username ? `@${user.username}` : 'Telegram User'}</p>
           </div>
-        </div>
-
-        {/* Trust Section */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <ShieldCheck size={18} className="text-green-500" />
-            <span>Telegram Verified</span>
-          </div>
-          <div className="text-xs text-gray-400 font-medium">Member since 2026</div>
         </div>
 
         {/* Quick Links */}

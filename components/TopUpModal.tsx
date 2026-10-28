@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Copy, CheckCircle2, ShieldCheck, Wallet } from 'lucide-react'
+import { X, Copy, CheckCircle2, ShieldCheck, Wallet, ChevronLeft } from 'lucide-react'
 
 export default function TopUpModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<'amount' | 'select' | 'pay' | 'hash'>('amount')
@@ -34,14 +34,28 @@ export default function TopUpModal({ onClose }: { onClose: () => void }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleBack = () => {
+    if (step === 'select') setStep('amount')
+    if (step === 'pay') setStep('select')
+    if (step === 'hash') setStep('pay')
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10 animate-slide-up">
         
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">
-            {step === 'amount' ? 'Top Up Balance' : step === 'select' ? 'Select Network' : 'Complete Payment'}
-          </h2>
+        {/* Header with Back Arrow */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            {step !== 'amount' && (
+              <button onClick={handleBack} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full">
+                <ChevronLeft size={20} />
+              </button>
+            )}
+            <h2 className="text-xl font-bold">
+              {step === 'amount' ? 'Top Up Balance' : step === 'select' ? 'Select Network' : 'Complete Payment'}
+            </h2>
+          </div>
           <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-500"><X size={20} /></button>
         </div>
 

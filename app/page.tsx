@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -28,15 +29,12 @@ export default function Storefront() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  
   const [activeTab, setActiveTab] = useState<Tab>('items')
   const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string, balance?: number } | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
-    // Fetch products
     const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).order('created_at', { ascending: false })
-    // Fetch schemas to know how to render (cards vs tables)
     const { data: schms } = await supabase.from('category_schemas').select('*')
     
     if (prods) setProducts(prods)
@@ -47,7 +45,6 @@ export default function Storefront() {
   useEffect(() => {
     fetchData()
     
-    // Telegram Auth
     const initTelegram = async () => {
       try {
         const tg = (window as any).Telegram?.WebApp
@@ -55,7 +52,6 @@ export default function Storefront() {
           tg.ready(); tg.expand();
           const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData }) })
           const data = await res.json()
-          
           if (res.status === 403) {
             alert('Your access has been revoked. Contact support.')
             tg.close()
@@ -67,14 +63,13 @@ export default function Storefront() {
         }
       } catch (e) {
         console.log('Not in Telegram:', e)
+        setUser({ id: 0, first_name: 'Browser', username: 'test_user', balance: 0 })
       }
     }
     initTelegram()
   }, [])
 
   const categories = ['All', ...new Set(products.map(p => p.category))]
-  
-  // Determine current view mode based on schema
   const activeSchema = schemas.find(s => s.category === activeCategory)
   const isTableView = activeSchema?.default_view === 'table'
 
@@ -86,7 +81,6 @@ export default function Storefront() {
   })
 
   if (activeTab === 'orders') return <><OrdersPage onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
-  // Pass the user object to ProfilePage
   if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
 
   return (
@@ -121,7 +115,7 @@ export default function Storefront() {
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-20 text-gray-500">No products found.</div>
       ) : isTableView ? (
-        /* TABLE VIEW (For CCs) */
+        /* TABLE VIEW */
         <div className="px-4 pt-2 overflow-x-auto">
           <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
@@ -157,7 +151,7 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
-        /* CARD VIEW (For Banks) */
+        /* CARD VIEW */
         <div className="px-4 pt-2 space-y-3">
           {filteredProducts.map((product) => (
             <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col">

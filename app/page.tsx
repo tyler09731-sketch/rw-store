@@ -39,13 +39,17 @@ export default function Storefront() {
 
   const fetchData = async () => {
     setLoading(true)
-    const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).order('created_at', { ascending: false })
-    const { data: schms } = await supabase.from('category_schemas').select('*')
-    const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'confirmed')
-    
-    if (prods) setProducts(prods)
-    if (schms) setSchemas(schms)
-    if (count) setOrderCount(count)
+    try {
+      const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).order('created_at', { ascending: false })
+      const { data: schms } = await supabase.from('category_schemas').select('*')
+      const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'confirmed')
+      
+      if (prods) setProducts(prods)
+      if (schms) setSchemas(schms)
+      if (count) setOrderCount(count)
+    } catch (e) {
+      console.error(e)
+    }
     setLoading(false)
   }
 
@@ -70,19 +74,23 @@ export default function Storefront() {
     initTelegram()
   }, [])
 
-  // FIXED: Reset filters on category change
+  // Clear filters when changing category
   useEffect(() => {
     setActiveFilters({})
   }, [activeCategory])
 
-  // FIXED: Hardcoded categories
+  // HARDCODED CATEGORIES
   const categories = ['All', 'Banks', 'CC Info']
   
-  const activeSchema = schemas.find(s => s.category === activeCategory)
-  
-  // FIXED: Strict view logic
-  const isTableView = activeCategory === 'CC Info'
+  // BULLETPROOF SCHEMA FINDER: Safely finds schema, ignoring case/whitespace
+  const activeSchema = schemas.find(s => 
+    s.category.toLowerCase().trim() === activeCategory.toLowerCase().trim()
+  )
 
+  // IF NO SCHEMA, DON'T CRASH. Just default to card view.
+  const isTableView = activeCategory === 'CC Info' && activeSchema?.default_view === 'table'
+
+  // SAFE FILTER LOGIC
   const filterableFields = useMemo(() => {
     if (!isTableView || !activeSchema || !activeSchema.fields) return []
     return activeSchema.fields.filter((field: any) => {
@@ -102,8 +110,10 @@ export default function Storefront() {
     const matchesSearch = searchString.includes(search.toLowerCase())
     const matchesCategory = activeCategory === 'All' || p.category === activeCategory
     
+    // IF NOT TABLE VIEW, IGNORE FILTERS
     if (!isTableView) return matchesSearch && matchesCategory
 
+    // IF TABLE VIEW, APPLY FILTERS
     const matchesFilters = Object.entries(activeFilters).every(([key, value]) => {
       if (!value) return true
       return p.metadata[key] === value
@@ -165,6 +175,7 @@ export default function Storefront() {
           ))}
         </div>
 
+        {/* Filters - Only show on Table View */}
         {isTableView && filterableFields.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1 w-full max-w-full">
             <div className="flex items-center gap-1 text-gray-500 mr-1 shrink-0">
@@ -201,27 +212,23 @@ export default function Storefront() {
         )}
       </div>
 
-      {hasActiveFilters && (
-        <div className="px-4 pt-2">
-          <p className="text-xs text-gray-500">{filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} found</p>
-        </div>
-      )}
-
       {loading ? (
         <div className="flex justify-center py-20"><RotateCw className="animate-spin text-orange-500" /></div>
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
-          <p>No products match your filters.</p>
+          <p>No products found.</p>
           {hasActiveFilters && (
             <button onClick={clearFilters} className="text-orange-500 text-sm font-semibold mt-2">Clear filters</button>
           )}
         </div>
       ) : isTableView ? (
+        /* TABLE VIEW */
         <div className="px-4 pt-2 w-full max-w-full overflow-x-auto">
           <table className="w-full min-w-[500px] text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
               <tr>
-                {activeSchema.fields.slice(0, 4).map((f: any) => <th key={f.name} className="p-3 font-semibold">{f.name}</th>)}
+                {/* Safe check for activeSchema.fields */}
+                {(activeSchema?.fields || []).slice(0, 4).map((f: any) => <th key={f.name} className="p-3 font-semibold">{f.name}</th>)}
                 <th className="p-3 font-semibold">Price</th>
                 <th className="p-3 font-semibold text-right">Action</th>
               </tr>
@@ -235,7 +242,7 @@ export default function Storefront() {
                   transition={{ delay: index * 0.05 }}
                   className="hover:bg-gray-50/50"
                 >
-                  {activeSchema.fields.slice(0, 4).map((f: any) => (
+                  {(activeSchema?.fields || []).slice(0, 4).map((f: any) => (
                     <td key={f.name} className="p-3 text-sm whitespace-nowrap">
                       {f.name === 'Country' ? (
                         <div className="flex items-center gap-1.5">
@@ -258,6 +265,7 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
+        /* CARD VIEW */
         <div className="px-4 pt-2 space-y-3 w-full max-w-full">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (

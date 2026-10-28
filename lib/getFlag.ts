@@ -3,37 +3,35 @@ import { Country } from 'country-state-city'
 export function getFlagEmoji(countryName: string) {
   if (!countryName) return '🏳️'
   
-  const cleanName = countryName.trim()
+  const cleanName = countryName.trim().toLowerCase()
   
-  // 1. If it's already a 2-letter code (e.g. "US"), just convert to emoji
-  if (cleanName.length === 2) {
-    try {
-      return String.fromCodePoint(...cleanName.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0)))
-    } catch { return '🏳️' }
+  // 1. Hardcoded fallback for weird cases
+  const dictionary: Record<string, string> = {
+    'us': 'US', 'usa': 'US', 'united states': 'US', 'united states of america': 'US',
+    'uk': 'GB', 'gb': 'GB', 'united kingdom': 'GB', 'great britain': 'GB',
+    'uae': 'AE', 'united arab emirates': 'AE',
+    'canada': 'CA', 'germany': 'DE', 'mexico': 'MX', 'switzerland': 'CH', 'sweden': 'SE',
+    'spain': 'ES', 'thailand': 'TH', 'india': 'IN', 'finland': 'FI', 'singapore': 'SG',
+    'france': 'FR', 'norway': 'NO', 'ireland': 'IE', 'belgium': 'BE', 'netherlands': 'NL',
+    'portugal': 'PT', 'czech republic': 'CZ', 'australia': 'AU', 'brazil': 'BR',
+    'austria': 'AT', 'poland': 'PL'
   }
-  
-  // 2. Look up by name in the library (case insensitive)
-  const allCountries = Country.getAllCountries()
-  const found = allCountries.find(
-    c => c.name.toLowerCase() === cleanName.toLowerCase()
-  )
-  
-  // 3. If exact match fails, try a partial match (e.g. "USA" -> "United States")
-  let isoCode = found?.isoCode
+
+  let isoCode = dictionary[cleanName]
+
+  // 2. If dictionary fails, try the library
   if (!isoCode) {
-    const partialMatch = allCountries.find(c => 
-      cleanName.toLowerCase().includes(c.name.toLowerCase()) || 
-      c.name.toLowerCase().includes(cleanName.toLowerCase()) ||
-      c.isoCode.toLowerCase() === cleanName.toLowerCase()
-    )
-    isoCode = partialMatch?.isoCode
+    const found = Country.getAllCountries().find(c => c.name.toLowerCase() === cleanName)
+    isoCode = found?.isoCode
   }
-  
-  // 4. Convert the ISO code to emoji
+
+  // 3. Convert to emoji
   if (isoCode && isoCode.length === 2) {
     try {
       return String.fromCodePoint(...isoCode.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0)))
-    } catch { return '🏳️' }
+    } catch {
+      return '🏳️'
+    }
   }
   
   return '🏳️'

@@ -16,7 +16,7 @@ type Order = {
   status: 'pending' | 'confirmed' | 'failed'
   delivery_info: string | null
   created_at: string
-  products: { title: string; category: string } // joined from products
+  products: { title: string; category: string }
 }
 
 export default function OrdersPage({ onBack, user }: { onBack: () => void, user: any }) {
@@ -24,6 +24,14 @@ export default function OrdersPage({ onBack, user }: { onBack: () => void, user:
   const [loading, setLoading] = useState(true)
   const [revealedOrder, setRevealedOrder] = useState<number | null>(null)
   const [copiedId, setCopiedId] = useState<number | null>(null)
+  const [supportUrl, setSupportUrl] = useState('https://t.me/')
+
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then(r => r.json())
+      .then(s => { if (s.support_url) setSupportUrl(s.support_url) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -81,14 +89,12 @@ export default function OrdersPage({ onBack, user }: { onBack: () => void, user:
           orders.map((order) => (
             <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               
-              {/* Order Header */}
               <div className="p-4 border-b border-gray-50 flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-gray-900">{order.products?.title || 'Product Deleted'}</h3>
                   <p className="text-xs text-gray-500">Ref: {order.order_ref}</p>
                 </div>
                 
-                {/* Status Badge */}
                 {order.status === 'confirmed' && (
                   <span className="flex items-center gap-1 bg-green-50 text-green-600 text-xs font-bold px-2.5 py-1 rounded-md">
                     <CheckCircle2 size={12} /> Delivered
@@ -106,7 +112,6 @@ export default function OrdersPage({ onBack, user }: { onBack: () => void, user:
                 )}
               </div>
 
-              {/* Order Details */}
               <div className="p-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Date:</span>
@@ -121,7 +126,6 @@ export default function OrdersPage({ onBack, user }: { onBack: () => void, user:
                   <span className="font-bold text-gray-900">${Math.floor(order.price_usd)}</span>
                 </div>
                 
-                {/* TXID Copy Button */}
                 {order.tx_hash && (
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500">TXID:</span>
@@ -135,7 +139,6 @@ export default function OrdersPage({ onBack, user }: { onBack: () => void, user:
                   </div>
                 )}
 
-                {/* Delivery Info (Reveal on Click) */}
                 {order.status === 'confirmed' && order.delivery_info && (
                   <div className="mt-2 pt-3 border-t border-gray-50">
                     <button
@@ -172,10 +175,9 @@ export default function OrdersPage({ onBack, user }: { onBack: () => void, user:
                   </div>
                 )}
 
-                {/* Support Button for Pending/Failed */}
                 {(order.status === 'pending' || order.status === 'failed') && (
                   <a 
-                    href="https://t.me/your_support_username" 
+                    href={supportUrl}
                     target="_blank" 
                     className="mt-2 w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-2.5 rounded-xl text-sm font-semibold active:scale-95 transition-transform"
                   >

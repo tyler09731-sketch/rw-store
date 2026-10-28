@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { User, Send, BookOpen, ShieldQuestion, ArrowLeft, Package, Wallet, LogOut } from 'lucide-react'
 import { haptic } from '@/lib/haptics'
 
@@ -14,7 +15,21 @@ export default function ProfilePage({
   onBack: () => void, 
   setActiveTab: (tab: Tab) => void 
 }) {
-  
+  const [supportUrl, setSupportUrl] = useState('https://t.me/')
+  const [proofsUrl, setProofsUrl] = useState('https://t.me/')
+  const [guidesUrl, setGuidesUrl] = useState('https://t.me/')
+
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then(r => r.json())
+      .then(s => {
+        if (s.support_url) setSupportUrl(s.support_url)
+        if (s.proofs_url) setProofsUrl(s.proofs_url)
+        if (s.guides_url) setGuidesUrl(s.guides_url)
+      })
+      .catch(() => {})
+  }, [])
+
   const handleQuickLink = (tab: Tab) => {
     haptic.light()
     setActiveTab(tab)
@@ -60,7 +75,7 @@ export default function ProfilePage({
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <a href="https://t.me/your_support_username" target="_blank" className="flex items-center gap-3 p-4 border-b border-gray-50 active:bg-gray-50">
+          <a href={supportUrl} target="_blank" className="flex items-center gap-3 p-4 border-b border-gray-50 active:bg-gray-50">
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
               <ShieldQuestion size={18} />
             </div>
@@ -70,7 +85,7 @@ export default function ProfilePage({
             </div>
           </a>
 
-          <a href="https://t.me/your_proof_channel" target="_blank" className="flex items-center gap-3 p-4 border-b border-gray-50 active:bg-gray-50">
+          <a href={proofsUrl} target="_blank" className="flex items-center gap-3 p-4 border-b border-gray-50 active:bg-gray-50">
             <div className="w-8 h-8 rounded-lg bg-green-50 text-green-500 flex items-center justify-center">
               <Send size={18} />
             </div>
@@ -80,7 +95,7 @@ export default function ProfilePage({
             </div>
           </a>
 
-          <a href="https://t.me/your_guide_channel" target="_blank" className="flex items-center gap-3 p-4 active:bg-gray-50">
+          <a href={guidesUrl} target="_blank" className="flex items-center gap-3 p-4 active:bg-gray-50">
             <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center">
               <BookOpen size={18} />
             </div>

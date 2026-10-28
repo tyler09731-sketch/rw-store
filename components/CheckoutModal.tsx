@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Copy, CheckCircle2, ShieldCheck, ChevronLeft } from 'lucide-react'
+import { X, Copy, CheckCircle2, ShieldCheck, ChevronLeft, Send } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { haptic } from '@/lib/haptics'
 
@@ -16,6 +16,14 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
   const [selectedCoin, setSelectedCoin] = useState<'BTC' | 'USDT_TRC20' | 'USDT_BEP20'>('USDT_TRC20')
   const [copied, setCopied] = useState(false)
   const [timeLeft, setTimeLeft] = useState(900)
+  const [supportUrl, setSupportUrl] = useState('https://t.me/')
+
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then(r => r.json())
+      .then(s => { if (s.support_url) setSupportUrl(s.support_url) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (step !== 'pay') return
@@ -25,11 +33,9 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
     return () => clearInterval(timer)
   }, [step])
 
-  // Native Telegram back button handling
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     if (!tg?.BackButton) return
-
     if (step !== 'select') {
       tg.BackButton.show()
       tg.BackButton.onClick(() => {
@@ -40,10 +46,7 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
     } else {
       tg.BackButton.hide()
     }
-
-    return () => {
-      tg.BackButton.offClick()
-    }
+    return () => { tg.BackButton.offClick() }
   }, [step])
 
   const formatTime = (seconds: number) => {
@@ -141,6 +144,10 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
                   <p className="text-xs text-gray-500">BSC Network</p>
                 </div>
               </button>
+
+              <a href={supportUrl} target="_blank" className="flex items-center justify-center gap-2 pt-2 text-sm text-gray-500 active:text-orange-500">
+                <Send size={14} /> Need help? Contact Support
+              </a>
             </div>
           )}
 
@@ -153,7 +160,7 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
 
               <div className="text-center py-4">
                 <p className="text-sm text-gray-500 mb-1">Send exactly</p>
-                <p className="text-2xl font-bold text-gray-900">{product.price_usd.toFixed(2)} USD</p>
+                <p className="text-2xl font-bold text-gray-900">${Math.floor(product.price_usd)} USD</p>
                 <p className="text-sm font-medium text-orange-500 mt-1">in {selectedCoin.replace('_', ' ')}</p>
               </div>
 
@@ -184,6 +191,9 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
                 <ShieldCheck size={18} />
                 Verify & Get Account
               </button>
+              <a href={supportUrl} target="_blank" className="flex items-center justify-center gap-2 pt-2 text-sm text-gray-500 active:text-orange-500">
+                <Send size={14} /> Stuck? Message Support
+              </a>
             </div>
           )}
 

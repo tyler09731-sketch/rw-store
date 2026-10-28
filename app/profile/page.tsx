@@ -1,8 +1,12 @@
 'use client'
 
-import { User, Send, BookOpen, ShieldQuestion, ArrowLeft } from 'lucide-react'
+import { useState } from 'react'
+import { User, Send, BookOpen, ShieldQuestion, ArrowLeft, Wallet, Plus } from 'lucide-react'
+import TopUpModal from '@/components/TopUpModal'
 
 export default function ProfilePage({ user, onBack }: { user: any, onBack: () => void }) {
+  const [showTopUp, setShowTopUp] = useState(false)
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 font-sans">
       <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-4 border-b border-gray-100 flex items-center gap-3">
@@ -27,6 +31,20 @@ export default function ProfilePage({ user, onBack }: { user: any, onBack: () =>
             <h2 className="font-bold text-lg">{user ? user.first_name : 'Loading...'}</h2>
             <p className="text-sm text-gray-500">{user?.username ? `@${user.username}` : 'Telegram User'}</p>
           </div>
+        </div>
+
+        {/* Balance Card */}
+        <div className="bg-gray-900 rounded-2xl p-5 shadow-lg flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-400 font-medium mb-1">Wallet Balance</p>
+            <p className="text-3xl font-bold text-white">${user?.balance?.toFixed(2) || '0.00'}</p>
+          </div>
+          <button 
+            onClick={() => setShowTopUp(true)}
+            className="bg-orange-500 text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-orange-500/30 active:scale-95 transition-transform flex items-center gap-2"
+          >
+            <Plus size={16} /> Top Up
+          </button>
         </div>
 
         {/* Support Links */}
@@ -64,6 +82,8 @@ export default function ProfilePage({ user, onBack }: { user: any, onBack: () =>
 
         </div>
       </div>
+
+      {showTopUp && <TopUpModal onClose={() => setShowTopUp(false)} />}
     </div>
   )
 }

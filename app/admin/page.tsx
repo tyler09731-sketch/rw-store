@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle } from 'lucide-react'
-import { getAllCountries, getStatesByCountryCode } from 'react-geo-data'
+import { Country, State } from 'country-state-city'
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/dropzone'
 import { useSupabaseUpload } from '@/hooks/use-supabase-upload'
 import { createClient } from '@/lib/supabase/client'
@@ -31,9 +31,9 @@ export default function AdminPage() {
   const [prodFields, setProdFields] = useState<Record<string, string>>({})
   const [selectedCountryCode, setSelectedCountryCode] = useState('')
 
-  // Geo Data
-  const countries = getAllCountries()
-  const availableStates = selectedCountryCode ? getStatesByCountryCode(selectedCountryCode) : []
+  // Geo Data (Using country-state-city)
+  const countries = Country.getAllCountries()
+  const availableStates = selectedCountryCode ? State.getStatesOfCountry(selectedCountryCode) : []
   const hasStates = availableStates.length > 0
 
   // Dropzone Hook
@@ -46,7 +46,7 @@ export default function AdminPage() {
     upsert: true,
   })
 
-  // Auto-set image URL when upload succeeds (FIXED)
+  // Auto-set image URL when upload succeeds
   useEffect(() => {
     if (uploadProps.isSuccess && uploadProps.successes.length > 0 && uploadProps.successes[0]) {
       const supabase = createClient()
@@ -96,7 +96,6 @@ export default function AdminPage() {
   const handleAddProduct = async () => {
     const finalMetadata = { ...prodFields }
     
-    // Ensure country and state are saved properly in metadata
     if (selectedCountryCode) {
       finalMetadata['Country'] = selectedCountryCode
     }
@@ -226,7 +225,7 @@ export default function AdminPage() {
                     setProdFields({...prodFields, [field.name]: e.target.value})
                   }} className="w-full bg-gray-50 p-3 rounded-lg text-sm">
                     <option value="">Select Country</option>
-                    {countries.map((c: any) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                    {countries.map((c: any) => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
                   </select>
                 )
               }
@@ -234,7 +233,7 @@ export default function AdminPage() {
                 return (
                   <select key={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-sm">
                     <option value="">Select State</option>
-                    {availableStates.map((s: any) => <option key={s.code} value={s.code}>{s.name}</option>)}
+                    {availableStates.map((s: any) => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
                   </select>
                 )
               }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Search, RotateCw, Package, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { getFlagEmoji } from '@/lib/getFlag'
 import { haptic } from '@/lib/haptics'
@@ -34,6 +34,9 @@ export default function Storefront() {
   const [activeTab, setActiveTab] = useState<Tab>('items')
   const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string, balance?: number } | null>(null)
   const [orderCount, setOrderCount] = useState(0)
+  
+  // Dynamic filters state
+  const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
 
   const fetchData = async () => {
     setLoading(true)
@@ -73,16 +76,71 @@ export default function Storefront() {
     initTelegram()
   }, [])
 
+  // Reset filters when category changes
+  useEffect(() => {
+    setActiveFilters({})
+  }, [activeCategory])
+
   const categories = ['All', ...new Set(products.map(p => p.category))]
   const activeSchema = schemas.find(s => s.category === activeCategory)
   const isTableView = activeSchema?.default_view === 'table'
 
+  // Determine which fields should be filterable (only show fields that have distinct values)
+  const filterableFields = useMemo(() => {
+    if (!activeSchema || !activeSchema.fields) return []
+    
+    return activeSchema.fields.filter((field: any) => {
+      // Skip fields that are not useful for filtering
+      if (['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(field.name)) return false
+      
+      // Check if this field has at least 2 distinct values in current category products
+      const categoryProducts = products.filter(p => p.category === activeCategory)
+      const values = new Set(categoryProducts.map(p => p.metadata[field.name]).filter(Boolean))
+      return values.size >= 1
+    })
+  }, [activeSchema, products, activeCategory])
+
+  // Get available options for each filterable field
+  const getFilterOptions = (fieldName: string) => {
+    const categoryProducts = products.filter(p => p.category === activeCategory)
+    const values = Array.from(new Set(categoryProducts.map(p => p.metadata[fieldName]).filter(Boolean)))
+    return values.sort()
+  }
+
+  // Filter products based on search + active category + active dynamic filters
   const filteredProducts = products.filter(p => {
     const searchString = `${p.title} ${JSON.stringify(p.metadata)}`.toLowerCase()
     const matchesSearch = searchString.includes(search.toLowerCase())
     const matchesCategory = activeCategory === 'All' || p.category === activeCategory
-    return matchesSearch && matchesCategory
+    
+    // Check all active dynamic filters
+    const matchesFilters = Object.entries(activeFilters).every(([key, value]) => {
+      if (!value) return true
+      return p.metadata[key] === value
+    })
+    
+    return matchesSearch && matchesCategory && matchesFilters
   })
+
+  const hasActiveFilters = Object.values(activeFilters).some(v => v)
+
+  const clearFilters = () => {
+    haptic.light()
+    setActiveFilters({})
+  }
+
+  const setFilter = (fieldName: string, value: string) => {
+    haptic.light()
+    setActiveFilters(prev => {
+      const next = { ...prev }
+      if (value === '') {
+        delete next[fieldName]
+      } else {
+        next[fieldName] = value
+      }
+      return next
+    })
+  }
 
   if (activeTab === 'orders') return <><OrdersPage onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
   if (activeTab === 'wallet') return <><WalletPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
@@ -121,12 +179,55 @@ export default function Storefront() {
             </button>
           ))}
         </div>
+
+        {/* Dynamic Filters Row */}
+        {isTableView && filterableFields.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center">
+            {filterableFields.map((field: any) => (
+              <div key={field.name} className="relative">
+                <select
+                  value={activeFilters[field.name] || ''}
+                  onChange={(e) => setFilter(field.name, e.target.value)}
+                  className={`appearance-none px-3 py-1.5 pr-7 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                    activeFilters[field.name]
+                      ? 'bg-orange-500 text-white border-orange-500'
+                      : 'bg-white text-gray-600 border-gray-200'
+                  }`}
+                >
+                  <option value="">{field.name}</option>
+                  {getFilterOptions(field.name).map((opt: string) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+                <ChevronRight size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none ${activeFilters[field.name] ? 'text-white' : 'text-gray-400'}`} />
+              </div>
+            ))}
+            
+            {hasActiveFilters && (
+              <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-500 border border-red-100 whitespace-nowrap">
+                <X size={12} /> Clear
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Results Count */}
+      {hasActiveFilters && (
+        <div className="px-4 pt-2">
+          <p className="text-xs text-gray-500">{filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} found</p>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-20"><RotateCw className="animate-spin text-orange-500" /></div>
       ) : filteredProducts.length === 0 ? (
-        <div className="text-center py-20 text-gray-500">No products found.</div>
+        <div className="text-center py-20 text-gray-500">
+          <p>No products match your filters.</p>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="text-orange-500 text-sm font-semibold mt-2">Clear filters</button>
+          )}
+        </div>
       ) : isTableView ? (
         <div className="px-4 pt-2 overflow-x-auto">
           <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">

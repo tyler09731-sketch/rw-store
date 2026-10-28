@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useDeferredValue } from 'react'
+import { useEffect, useState, useDeferredValue } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X, SlidersHorizontal } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
@@ -24,12 +24,8 @@ type Product = {
 
 type Tab = 'items' | 'orders' | 'wallet' | 'profile'
 
-// Fields we don't want to show in the main table (they're too long or handled elsewhere)
-const HIDDEN_FIELDS = ['Address', 'Email', 'Seller', 'Balance']
-
 export default function Storefront() {
   const [products, setProducts] = useState<Product[]>([])
-  const [schemas, setSchemas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
@@ -46,11 +42,8 @@ export default function Storefront() {
     setLoading(true)
     try {
       const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).order('created_at', { ascending: false })
-      const { data: schms } = await supabase.from('category_schemas').select('*')
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'confirmed')
-      
       if (prods) setProducts(prods)
-      if (schms) setSchemas(schms)
       if (count) setOrderCount(count)
     } catch (e) {
       console.error(e)
@@ -87,28 +80,9 @@ export default function Storefront() {
   const categories = ['All', 'Banks', 'CC Info']
   const isTableView = activeCategory === 'CC Info'
 
-  // THE FIX: Derive columns from the actual products in the CC Info category
-  const tableColumns = useMemo(() => {
-    if (!isTableView) return []
-    
-    // Find the first CC product to use as the template
-    const firstCC = products.find(p => p.category === 'CC Info')
-    if (!firstCC || !firstCC.metadata) return []
-    
-    // Get all keys from the metadata, excluding the hidden ones
-    const keys = Object.keys(firstCC.metadata).filter(k => !HIDDEN_FIELDS.includes(k))
-    return keys.slice(0, 5) // Limit to 5 for mobile
-  }, [isTableView, products])
-
-  // Filters derive from the same column logic
-  const filterableFields = useMemo(() => {
-    if (!isTableView) return []
-    const firstCC = products.find(p => p.category === 'CC Info')
-    if (!firstCC || !firstCC.metadata) return []
-    return Object.keys(firstCC.metadata).filter(k => 
-      !['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(k)
-    )
-  }, [isTableView, products])
+  // HARDCODED CC COLUMNS (The exact keys we injected)
+  const ccColumns = ['BIN', 'Exp', 'Country', 'State', 'Bank', 'Level', 'Network']
+  const ccFilters = ['Country', 'State', 'Bank', 'Level', 'Network']
 
   const getFilterOptions = (fieldName: string) => {
     const categoryProducts = products.filter(p => p.category === activeCategory)
@@ -189,14 +163,14 @@ export default function Storefront() {
           ))}
         </div>
 
-        {isTableView && filterableFields.length > 0 && (
+        {isTableView && (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1 w-full max-w-full">
             <div className="flex items-center gap-1 text-gray-500 mr-1 shrink-0">
               <SlidersHorizontal size={14} />
               <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
             </div>
             
-            {filterableFields.map((fieldName: string) => (
+            {ccFilters.map((fieldName: string) => (
               <div key={fieldName} className="relative shrink-0">
                 <select
                   value={activeFilters[fieldName] || ''}
@@ -244,8 +218,7 @@ export default function Storefront() {
             <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
                 <tr>
-                  {/* DYNAMIC COLUMNS from tableColumns */}
-                  {tableColumns.map((col) => (
+                  {ccColumns.map((col) => (
                     <th key={col} className="p-3 font-semibold whitespace-nowrap">{col}</th>
                   ))}
                   <th className="p-3 font-semibold whitespace-nowrap">Price</th>
@@ -261,13 +234,12 @@ export default function Storefront() {
                     transition={{ delay: index * 0.05 }}
                     className="hover:bg-gray-50/50"
                   >
-                    {/* DYNAMIC CELLS from tableColumns */}
-                    {tableColumns.map((col) => (
+                    {ccColumns.map((col) => (
                       <td key={col} className="p-3 text-sm whitespace-nowrap">
                         {col === 'Country' ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-base leading-none">{getFlagEmoji(p.metadata[col] || 'US')}</span>
-                            <span className="font-medium">{p.metadata[col] === 'GB' ? 'UK' : p.metadata[col]}</span>
+                            <span className="text-base leading-none">{getFlagEmoji(p.metadata['Country'] || 'US')}</span>
+                            <span className="font-medium">{p.metadata['Country'] === 'GB' ? 'UK' : p.metadata['Country']}</span>
                           </div>
                         ) : (
                           <span className="block">{p.metadata[col] || '-'}</span>

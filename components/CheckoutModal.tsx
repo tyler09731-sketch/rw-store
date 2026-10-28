@@ -118,7 +118,15 @@ export default function CheckoutModal({ product, onClose }: { product: Product, 
               <div className="text-center py-4">
                 <p className="text-sm text-gray-500 mb-1">Send exactly</p>
                 <p className="text-2xl font-bold text-gray-900">{product.price_usd.toFixed(2)} USD</p>
-                <p className="text-sm font-medium text-orange-500 mt-1">in {selectedCoin.replace('_', ' ')}</p>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <p className="text-sm font-medium text-orange-500">in {selectedCoin.replace('_', ' ')}</p>
+                  <button 
+                    onClick={() => { haptic.light(); setStep('select'); }}
+                    className="text-xs font-semibold text-gray-400 underline"
+                  >
+                    Change
+                  </button>
+                </div>
               </div>
 
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">

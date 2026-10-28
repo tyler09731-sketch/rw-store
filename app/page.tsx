@@ -83,7 +83,7 @@ export default function Storefront() {
 
   if (activeTab === 'orders') return <><OrdersPage onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
   if (activeTab === 'wallet') return <><WalletPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
-  if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
+  if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} setActiveTab={setActiveTab} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900">

@@ -1,8 +1,25 @@
 'use client'
 
-import { User, Send, BookOpen, ShieldQuestion, ArrowLeft } from 'lucide-react'
+import { User, Send, BookOpen, ShieldQuestion, ArrowLeft, Package, Wallet, LogOut, ShieldCheck } from 'lucide-react'
+import { haptic } from '@/lib/haptics'
 
-export default function ProfilePage({ user, onBack }: { user: any, onBack: () => void }) {
+type Tab = 'items' | 'orders' | 'wallet' | 'profile'
+
+export default function ProfilePage({ 
+  user, 
+  onBack, 
+  setActiveTab 
+}: { 
+  user: any, 
+  onBack: () => void, 
+  setActiveTab: (tab: Tab) => void 
+}) {
+  
+  const handleQuickLink = (tab: Tab) => {
+    haptic.light()
+    setActiveTab(tab)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 font-sans">
       <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-4 border-b border-gray-100 flex items-center gap-3">
@@ -29,9 +46,32 @@ export default function ProfilePage({ user, onBack }: { user: any, onBack: () =>
           </div>
         </div>
 
+        {/* Trust Section */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <ShieldCheck size={18} className="text-green-500" />
+            <span>Telegram Verified</span>
+          </div>
+          <div className="text-xs text-gray-400 font-medium">Member since 2026</div>
+        </div>
+
+        {/* Quick Links */}
+        <div>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Quick Actions</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => handleQuickLink('orders')} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-2 active:scale-95 transition-transform">
+              <Package size={24} className="text-orange-500" />
+              <span className="text-sm font-semibold">My Orders</span>
+            </button>
+            <button onClick={() => handleQuickLink('wallet')} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-2 active:scale-95 transition-transform">
+              <Wallet size={24} className="text-orange-500" />
+              <span className="text-sm font-semibold">My Wallet</span>
+            </button>
+          </div>
+        </div>
+
         {/* Support Links */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          
           <a href="https://t.me/your_support_username" target="_blank" className="flex items-center gap-3 p-4 border-b border-gray-50 active:bg-gray-50">
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
               <ShieldQuestion size={18} />
@@ -61,8 +101,19 @@ export default function ProfilePage({ user, onBack }: { user: any, onBack: () =>
               <p className="text-xs text-gray-500">Learn how to cash out</p>
             </div>
           </a>
-
         </div>
+
+        {/* App Info / Log Out */}
+        <div className="text-center pt-4">
+          <p className="text-xs text-gray-400 mb-2">RW Store v2.0</p>
+          <button 
+            onClick={() => { haptic.light(); alert('Session cleared. Close the app to log out.'); }}
+            className="flex items-center justify-center gap-2 text-sm font-semibold text-red-500 mx-auto"
+          >
+            <LogOut size={16} /> Clear Session
+          </button>
+        </div>
+
       </div>
     </div>
   )

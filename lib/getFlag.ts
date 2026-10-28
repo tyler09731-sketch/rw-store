@@ -1,38 +1,31 @@
-import { Country } from 'country-state-city'
+const map: Record<string, string> = {
+  'united states': '🇺🇸', 'usa': '🇺🇸', 'us': '🇺🇸',
+  'united kingdom': '🇬🇧', 'uk': '🇬🇧', 'gb': '🇬🇧',
+  'canada': '🇨🇦', 'ca': '🇨🇦',
+  'germany': '🇩🇪', 'de': '🇩🇪',
+  'mexico': '🇲🇽', 'mx': '🇲🇽',
+  'switzerland': '🇨🇭', 'ch': '🇨🇭',
+  'sweden': '🇸🇪', 'se': '🇸🇪',
+  'spain': '🇪🇸', 'es': '🇪🇸',
+  'thailand': '🇹🇭', 'th': '🇹🇭',
+  'uae': '🇦🇪', 'ae': '🇦🇪',
+  'india': '🇮🇳', 'in': '🇮🇳',
+  'finland': '🇫🇮', 'fi': '🇫🇮',
+  'singapore': '🇸🇬', 'sg': '🇸🇬',
+  'france': '🇫🇷', 'fr': '🇫🇷',
+  'norway': '🇳🇴', 'no': '🇳🇴',
+  'ireland': '🇮🇪', 'ie': '🇮🇪',
+  'belgium': '🇧🇪', 'be': '🇧🇪',
+  'netherlands': '🇳🇱', 'nl': '🇳🇱',
+  'portugal': '🇵🇹', 'pt': '🇵🇹',
+  'czech republic': '🇨🇿', 'cz': '🇨🇿',
+  'australia': '🇦🇺', 'au': '🇦🇺',
+  'brazil': '🇧🇷', 'br': '🇧🇷',
+  'austria': '🇦🇹', 'at': '🇦🇹',
+  'poland': '🇵🇱', 'pl': '🇵🇱',
+}
 
-export function getFlagEmoji(countryName: string) {
-  if (!countryName) return '🏳️'
-  
-  const cleanName = countryName.trim().toLowerCase()
-  
-  // 1. Hardcoded fallback for weird cases
-  const dictionary: Record<string, string> = {
-    'us': 'US', 'usa': 'US', 'united states': 'US', 'united states of america': 'US',
-    'uk': 'GB', 'gb': 'GB', 'united kingdom': 'GB', 'great britain': 'GB',
-    'uae': 'AE', 'united arab emirates': 'AE',
-    'canada': 'CA', 'germany': 'DE', 'mexico': 'MX', 'switzerland': 'CH', 'sweden': 'SE',
-    'spain': 'ES', 'thailand': 'TH', 'india': 'IN', 'finland': 'FI', 'singapore': 'SG',
-    'france': 'FR', 'norway': 'NO', 'ireland': 'IE', 'belgium': 'BE', 'netherlands': 'NL',
-    'portugal': 'PT', 'czech republic': 'CZ', 'australia': 'AU', 'brazil': 'BR',
-    'austria': 'AT', 'poland': 'PL'
-  }
-
-  let isoCode: string | undefined = dictionary[cleanName]
-
-  // 2. If dictionary fails, try the library
-  if (!isoCode) {
-    const found = Country.getAllCountries().find(c => c.name.toLowerCase() === cleanName)
-    isoCode = found?.isoCode
-  }
-
-  // 3. Convert to emoji
-  if (isoCode && isoCode.length === 2) {
-    try {
-      return String.fromCodePoint(...isoCode.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0)))
-    } catch {
-      return '🏳️'
-    }
-  }
-  
-  return '🏳️'
+export function getFlagEmoji(country: string) {
+  if (!country) return '🏳️'
+  return map[country.trim().toLowerCase()] || '🏳️'
 }

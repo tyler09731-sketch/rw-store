@@ -1,19 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactCompiler: true, // This is the magic line
-  experimental: {
-    agentFeedback: true,
+  reactCompiler: true,
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'upload.wikimedia.org' },
+      { protocol: 'https', hostname: 'cdn.jsdelivr.net' },
+    ],
   },
+  experimental: { agentFeedback: true },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
+    rules: { "*.css": { loaders: ["@tailwindcss/turbopack"], as: "*.css" } },
   },
 };
 

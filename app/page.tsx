@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useDeferredValue } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X, SlidersHorizontal } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
@@ -29,6 +29,8 @@ export default function Storefront() {
   const [schemas, setSchemas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
+  
   const [activeCategory, setActiveCategory] = useState('All')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('items')
@@ -74,23 +76,24 @@ export default function Storefront() {
     initTelegram()
   }, [])
 
-  // Clear filters when changing category
+  // Reset filters and search when changing tabs
   useEffect(() => {
     setActiveFilters({})
+    setSearch('')
   }, [activeCategory])
 
   // HARDCODED CATEGORIES
   const categories = ['All', 'Banks', 'CC Info']
   
-  // BULLETPROOF SCHEMA FINDER: Safely finds schema, ignoring case/whitespace
+  // SAFE SCHEMA LOOKUP
   const activeSchema = schemas.find(s => 
     s.category.toLowerCase().trim() === activeCategory.toLowerCase().trim()
   )
+  
+  // VIEW LOGIC: CC Info is Table, everything else is Cards
+  const isTableView = activeCategory === 'CC Info'
 
-  // IF NO SCHEMA, DON'T CRASH. Just default to card view.
-  const isTableView = activeCategory === 'CC Info' && activeSchema?.default_view === 'table'
-
-  // SAFE FILTER LOGIC
+  // FILTER FIELDS: Only show for CC Info
   const filterableFields = useMemo(() => {
     if (!isTableView || !activeSchema || !activeSchema.fields) return []
     return activeSchema.fields.filter((field: any) => {
@@ -107,18 +110,24 @@ export default function Storefront() {
 
   const filteredProducts = products.filter(p => {
     const searchString = `${p.title} ${JSON.stringify(p.metadata)}`.toLowerCase()
-    const matchesSearch = searchString.includes(search.toLowerCase())
-    const matchesCategory = activeCategory === 'All' || p.category === activeCategory
+    const matchesSearch = searchString.includes(deferredSearch.toLowerCase())
     
-    // IF NOT TABLE VIEW, IGNORE FILTERS
-    if (!isTableView) return matchesSearch && matchesCategory
+    // 1. Filter by Category Tab (All only shows Banks, CCs are hidden)
+    if (activeCategory === 'All') {
+      if (p.category !== 'Banks') return false
+    } else if (activeCategory !== p.category) {
+      return false
+    }
 
-    // IF TABLE VIEW, APPLY FILTERS
+    // 2. If not on CC Info, only search matters (no complex filters)
+    if (!isTableView) return matchesSearch
+
+    // 3. If on CC Info, apply filters + search
     const matchesFilters = Object.entries(activeFilters).every(([key, value]) => {
       if (!value) return true
       return p.metadata[key] === value
     })
-    return matchesSearch && matchesCategory && matchesFilters
+    return matchesSearch && matchesFilters
   })
 
   const hasActiveFilters = Object.values(activeFilters).some(v => v)
@@ -164,7 +173,7 @@ export default function Storefront() {
 
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input type="text" placeholder="Search everything..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-xl shadow-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm" />
+          <input type="text" placeholder="Search bank, description, balance..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-xl shadow-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm" />
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
@@ -175,7 +184,6 @@ export default function Storefront() {
           ))}
         </div>
 
-        {/* Filters - Only show on Table View */}
         {isTableView && filterableFields.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1 w-full max-w-full">
             <div className="flex items-center gap-1 text-gray-500 mr-1 shrink-0">
@@ -222,12 +230,10 @@ export default function Storefront() {
           )}
         </div>
       ) : isTableView ? (
-        /* TABLE VIEW */
         <div className="px-4 pt-2 w-full max-w-full overflow-x-auto">
           <table className="w-full min-w-[500px] text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
               <tr>
-                {/* Safe check for activeSchema.fields */}
                 {(activeSchema?.fields || []).slice(0, 4).map((f: any) => <th key={f.name} className="p-3 font-semibold">{f.name}</th>)}
                 <th className="p-3 font-semibold">Price</th>
                 <th className="p-3 font-semibold text-right">Action</th>
@@ -265,7 +271,6 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
-        /* CARD VIEW */
         <div className="px-4 pt-2 space-y-3 w-full max-w-full">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (

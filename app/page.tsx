@@ -35,7 +35,6 @@ export default function Storefront() {
   const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string, balance?: number } | null>(null)
   const [orderCount, setOrderCount] = useState(0)
   
-  // Dynamic filters state
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
 
   const fetchData = async () => {
@@ -52,7 +51,6 @@ export default function Storefront() {
 
   useEffect(() => {
     fetchData()
-    
     const initTelegram = async () => {
       try {
         const tg = (window as any).Telegram?.WebApp
@@ -60,11 +58,7 @@ export default function Storefront() {
           tg.ready(); tg.expand();
           const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData }) })
           const data = await res.json()
-          if (res.status === 403) {
-            alert('Your access has been revoked. Contact support.')
-            tg.close()
-            return
-          }
+          if (res.status === 403) { alert('Revoked.'); tg.close(); return }
           if (data.success) setUser(data.user)
         } else {
           setUser({ id: 0, first_name: 'Browser', username: 'test_user', balance: 0 })
@@ -76,22 +70,17 @@ export default function Storefront() {
     initTelegram()
   }, [])
 
-  // Reset filters when category changes
   useEffect(() => {
     setActiveFilters({})
   }, [activeCategory])
 
   const categories = ['All', ...new Set(products.map(p => p.category))]
   const activeSchema = schemas.find(s => s.category === activeCategory)
-  
-  // FIX: Only use Table view if we are in a specific category (not "All") AND the schema says it's a table.
   const isTableView = activeCategory !== 'All' && activeSchema?.default_view === 'table'
 
-  // Filterable fields
+  // FIXED: Allow Bank to be filterable, skip useless fields
   const filterableFields = useMemo(() => {
-    // Only show filters for table views (like CC Info), not for the general store or cards.
     if (!isTableView || !activeSchema || !activeSchema.fields) return []
-    
     return activeSchema.fields.filter((field: any) => {
       if (['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(field.name)) return false
       const categoryProducts = products.filter(p => p.category === activeCategory)
@@ -138,7 +127,8 @@ export default function Storefront() {
   if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} setActiveTab={setActiveTab} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900">
+    // FIX: Added overflow-x-hidden to prevent horizontal page scroll
+    <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900 overflow-x-hidden w-full relative">
       <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-2">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -171,16 +161,15 @@ export default function Storefront() {
           ))}
         </div>
 
-        {/* Horizontal Dynamic Filters */}
         {filterableFields.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1">
-            <div className="flex items-center gap-1 text-gray-500 mr-1">
+            <div className="flex items-center gap-1 text-gray-500 mr-1 shrink-0">
               <SlidersHorizontal size={14} />
               <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
             </div>
             
             {filterableFields.map((field: any) => (
-              <div key={field.name} className="relative">
+              <div key={field.name} className="relative shrink-0">
                 <select
                   value={activeFilters[field.name] || ''}
                   onChange={(e) => setFilter(field.name, e.target.value)}
@@ -200,7 +189,7 @@ export default function Storefront() {
             ))}
             
             {hasActiveFilters && (
-              <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-500 border border-red-100 whitespace-nowrap">
+              <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-500 border border-red-100 whitespace-nowrap shrink-0">
                 <X size={12} /> Clear
               </button>
             )}
@@ -208,7 +197,6 @@ export default function Storefront() {
         )}
       </div>
 
-      {/* Results Count */}
       {hasActiveFilters && (
         <div className="px-4 pt-2">
           <p className="text-xs text-gray-500">{filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} found</p>
@@ -225,9 +213,9 @@ export default function Storefront() {
           )}
         </div>
       ) : isTableView ? (
-        /* TABLE VIEW (Only shows when a specific category like CC Info is selected) */
-        <div className="px-4 pt-2 overflow-x-auto">
-          <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+        // FIX: Table View - Wrap table in a div with overflow-x-auto and set min-width on table
+        <div className="px-4 pt-2 w-full overflow-x-auto">
+          <table className="w-full min-w-[500px] text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
               <tr>
                 {activeSchema.fields.slice(0, 4).map((f: any) => <th key={f.name} className="p-3 font-semibold">{f.name}</th>)}
@@ -245,7 +233,7 @@ export default function Storefront() {
                   className="hover:bg-gray-50/50"
                 >
                   {activeSchema.fields.slice(0, 4).map((f: any) => (
-                    <td key={f.name} className="p-3 text-sm">
+                    <td key={f.name} className="p-3 text-sm whitespace-nowrap">
                       {f.name === 'Country' ? (
                         <div className="flex items-center gap-1.5">
                           <span className="text-base leading-none">{getFlagEmoji(p.metadata.Country || 'US')}</span>
@@ -267,7 +255,6 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
-        /* PREMIUM CARD VIEW (Shows on "All" tab and Card categories) */
         <div className="px-4 pt-2 space-y-3">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (
@@ -277,7 +264,7 @@ export default function Storefront() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2, delay: index * 0.05 }}
-                className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col"
+                className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full"
               >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
@@ -302,7 +289,6 @@ export default function Storefront() {
                   </p>
                   {product.metadata.Description && <p className="text-xs font-medium text-gray-500 mt-1">{product.metadata.Description}</p>}
                   
-                  {/* Sleek Badges replacing ugly text */}
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {Object.entries(product.metadata)
                       .filter(([key]) => ['Level', 'Network', 'Bank'].includes(key))

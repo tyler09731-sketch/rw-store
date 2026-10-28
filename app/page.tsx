@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Star, Package } from 'lucide-react'
-import { retrieveLaunchParams } from '@telegram-apps/sdk'
 import CheckoutModal from '@/components/CheckoutModal'
 import BottomNav from '@/components/BottomNav'
 import OrdersPage from './orders/page'
@@ -29,11 +28,10 @@ export default function Storefront() {
   const [categories, setCategories] = useState<string[]>(['All'])
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   
-  // Navigation & User State
   const [activeTab, setActiveTab] = useState<Tab>('items')
   const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string } | null>(null)
 
-  // Fetch products from Supabase
+  // Fetch products
   const fetchProducts = async () => {
     setLoading(true)
     const { data } = await supabase
@@ -54,40 +52,48 @@ export default function Storefront() {
     fetchProducts()
   }, [])
 
-  // Telegram Auth & Registration
+  // Telegram Auth (Native WebApp Object)
   useEffect(() => {
     const initTelegram = async () => {
       try {
-        const { initDataRaw } = retrieveLaunchParams()
+        // Access the native Telegram object
+        const tg = (window as any).Telegram?.WebApp
         
-        if (initDataRaw) {
+        if (tg && tg.initData) {
+          // Tell Telegram the app is ready
+          tg.ready()
+          tg.expand()
+
           const res = await fetch('/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initData: initDataRaw })
+            body: JSON.stringify({ initData: tg.initData })
           })
           
           const data = await res.json()
           
           if (res.status === 403) {
             alert('Your access has been revoked. Contact support.')
-            window.location.href = 'https://t.me/your_support_username'
+            tg.close()
             return
           }
 
           if (data.success) {
             setUser(data.user)
           }
+        } else {
+          // Fallback for local testing in normal browser
+          setUser({ id: 0, first_name: 'Browser', username: 'test_user' })
         }
       } catch (e) {
-        console.log('Not in Telegram or error:', e)
+        console.log('Auth error:', e)
+        setUser({ id: 0, first_name: 'Browser', username: 'test_user' })
       }
     }
     
     initTelegram()
   }, [])
 
-  // Filter logic
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) || 
                           p.balance_info.toLowerCase().includes(search.toLowerCase())
@@ -95,15 +101,11 @@ export default function Storefront() {
     return matchesSearch && matchesCategory
   })
 
-  // Handle Tab Switching
   if (activeTab === 'orders') return <><OrdersPage onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
   if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
 
-  // Default: Items Tab
   return (
     <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900">
-      
-      {/* Sticky Header */}
       <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-2">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -151,7 +153,6 @@ export default function Storefront() {
         </div>
       </div>
 
-      {/* Product List */}
       <div className="px-4 pt-2 space-y-3">
         {loading ? (
           <div className="flex justify-center py-10">

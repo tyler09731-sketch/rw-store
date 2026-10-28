@@ -37,6 +37,9 @@ export default function Storefront() {
   const [orderCount, setOrderCount] = useState(0)
   
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
+  
+  // NEW: State for the custom filter modal
+  const [filterModal, setFilterModal] = useState<string | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -129,16 +132,16 @@ export default function Storefront() {
     setActiveFilters({})
   }
 
-  const setFilter = (fieldName: string, value: string) => {
-    haptic.light()
+  const applyFilter = (fieldName: string, value: string) => {
+    haptic.success()
     setActiveFilters(prev => {
       const next = { ...prev }
       if (value === '') { delete next[fieldName] } else { next[fieldName] = value }
       return next
     })
+    setFilterModal(null)
   }
 
-  // FIXED: Pass user to OrdersPage
   if (activeTab === 'orders') return <><OrdersPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
   if (activeTab === 'wallet') return <><WalletPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
   if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} setActiveTab={setActiveTab} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
@@ -185,28 +188,23 @@ export default function Storefront() {
             </div>
             
             {ccFilters.map((fieldName: string) => (
-              <div key={fieldName} className="relative shrink-0">
-                <select
-                  value={activeFilters[fieldName] || ''}
-                  onChange={(e) => setFilter(fieldName, e.target.value)}
-                  className={`appearance-none px-3 py-1.5 pr-7 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                    activeFilters[fieldName]
-                      ? 'bg-orange-500 text-white border-orange-500'
-                      : 'bg-white text-gray-600 border-gray-200'
-                  }`}
-                >
-                  <option value="">{fieldName}</option>
-                  {getFilterOptions(fieldName).map((opt: string) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-                <ChevronRight size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none ${activeFilters[fieldName] ? 'text-white' : 'text-gray-400'}`} />
-              </div>
+              <button
+                key={fieldName}
+                onClick={() => { haptic.light(); setFilterModal(fieldName); }}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
+                  activeFilters[fieldName]
+                    ? 'bg-orange-500 text-white border-orange-500'
+                    : 'bg-white text-gray-600 border-gray-200'
+                }`}
+              >
+                {activeFilters[fieldName] ? activeFilters[fieldName] : fieldName}
+                {activeFilters[fieldName] ? <X size={12} onClick={(e) => { e.stopPropagation(); applyFilter(fieldName, ''); }} /> : <ChevronRight size={12} className="rotate-90" />}
+              </button>
             ))}
             
             {hasActiveFilters && (
               <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-500 border border-red-100 whitespace-nowrap shrink-0">
-                <X size={12} /> Clear
+                Clear
               </button>
             )}
           </div>
@@ -341,6 +339,53 @@ export default function Storefront() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* NEW: Custom Bottom Sheet Filter Modal */}
+      <AnimatePresence>
+        {filterModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setFilterModal(null)}
+          >
+            <motion.div 
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10 max-h-[70vh] flex flex-col"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">Select {filterModal}</h2>
+                <button onClick={() => setFilterModal(null)} className="p-2 bg-gray-100 rounded-full text-gray-500">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="overflow-y-auto space-y-2 pr-2">
+                <button 
+                  onClick={() => applyFilter(filterModal, '')}
+                  className={`w-full text-left p-4 rounded-xl font-medium border transition-colors ${
+                    !activeFilters[filterModal] ? 'bg-orange-50 border-orange-500 text-orange-600' : 'bg-white border-gray-100 text-gray-700'
+                  }`}
+                >
+                  All
+                </button>
+                {getFilterOptions(filterModal).map((option: string) => (
+                  <button 
+                    key={option}
+                    onClick={() => applyFilter(filterModal, option)}
+                    className={`w-full text-left p-4 rounded-xl font-medium border transition-colors ${
+                      activeFilters[filterModal] === option ? 'bg-orange-50 border-orange-500 text-orange-600' : 'bg-white border-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {selectedProduct && <CheckoutModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />

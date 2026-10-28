@@ -76,31 +76,40 @@ export default function Storefront() {
     initTelegram()
   }, [])
 
-  // Reset filters and search when changing tabs
   useEffect(() => {
     setActiveFilters({})
     setSearch('')
   }, [activeCategory])
 
-  // HARDCODED CATEGORIES
   const categories = ['All', 'Banks', 'CC Info']
   
-  // SAFE SCHEMA LOOKUP
   const activeSchema = schemas.find(s => 
     s.category.toLowerCase().trim() === activeCategory.toLowerCase().trim()
   )
   
-  // VIEW LOGIC: CC Info is Table, everything else is Cards
   const isTableView = activeCategory === 'CC Info'
 
-  // FILTER FIELDS: Only show for CC Info
+  // THE CLEAN FIX: Parse schema fields safely. No hardcoded fallbacks.
+  const schemaFields = useMemo(() => {
+    if (!activeSchema || !activeSchema.fields) return []
+    // If it's a string, parse it. If it's already an array, use it.
+    if (typeof activeSchema.fields === 'string') {
+      try {
+        return JSON.parse(activeSchema.fields)
+      } catch {
+        return []
+      }
+    }
+    return Array.isArray(activeSchema.fields) ? activeSchema.fields : []
+  }, [activeSchema])
+
   const filterableFields = useMemo(() => {
-    if (!isTableView || !activeSchema || !activeSchema.fields) return []
-    return activeSchema.fields.filter((field: any) => {
+    if (!isTableView) return []
+    return schemaFields.filter((field: any) => {
       if (['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(field.name)) return false
       return true
     })
-  }, [isTableView, activeSchema])
+  }, [isTableView, schemaFields])
 
   const getFilterOptions = (fieldName: string) => {
     const categoryProducts = products.filter(p => p.category === activeCategory)
@@ -112,17 +121,14 @@ export default function Storefront() {
     const searchString = `${p.title} ${JSON.stringify(p.metadata)}`.toLowerCase()
     const matchesSearch = searchString.includes(deferredSearch.toLowerCase())
     
-    // 1. Filter by Category Tab (All only shows Banks, CCs are hidden)
     if (activeCategory === 'All') {
       if (p.category !== 'Banks') return false
     } else if (activeCategory !== p.category) {
       return false
     }
 
-    // 2. If not on CC Info, only search matters (no complex filters)
     if (!isTableView) return matchesSearch
 
-    // 3. If on CC Info, apply filters + search
     const matchesFilters = Object.entries(activeFilters).every(([key, value]) => {
       if (!value) return true
       return p.metadata[key] === value
@@ -230,45 +236,50 @@ export default function Storefront() {
           )}
         </div>
       ) : isTableView ? (
-        <div className="px-4 pt-2 w-full max-w-full overflow-x-auto">
-          <table className="w-full min-w-[500px] text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
-              <tr>
-                {(activeSchema?.fields || []).slice(0, 4).map((f: any) => <th key={f.name} className="p-3 font-semibold">{f.name}</th>)}
-                <th className="p-3 font-semibold">Price</th>
-                <th className="p-3 font-semibold text-right">Action</th>
-              </tr>
-            </thead>
-            <motion.tbody className="divide-y divide-gray-50">
-              {filteredProducts.map((p, index) => (
-                <motion.tr 
-                  key={p.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="hover:bg-gray-50/50"
-                >
-                  {(activeSchema?.fields || []).slice(0, 4).map((f: any) => (
-                    <td key={f.name} className="p-3 text-sm whitespace-nowrap">
-                      {f.name === 'Country' ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-base leading-none">{getFlagEmoji(p.metadata.Country || 'US')}</span>
-                          <span className="font-medium">{p.metadata.Country === 'GB' ? 'UK' : p.metadata.Country}</span>
-                          {p.metadata.State && <span className="text-xs text-gray-400">({p.metadata.State})</span>}
-                        </div>
-                      ) : (
-                        <span className="truncate max-w-[100px] block">{p.metadata[f.name] || '-'}</span>
-                      )}
+        <div className="px-4 pt-2 w-full max-w-full relative">
+          <div className="flex items-center gap-1 text-xs text-gray-400 font-medium mb-1 ml-1">
+            <span>← Swipe to see details →</span>
+          </div>
+          
+          <div className="overflow-x-auto w-full pb-20">
+            <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
+                <tr>
+                  {schemaFields.slice(0, 5).map((f: any) => <th key={f.name} className="p-3 font-semibold whitespace-nowrap">{f.name}</th>)}
+                  <th className="p-3 font-semibold whitespace-nowrap">Price</th>
+                  <th className="p-3 w-16"></th>
+                </tr>
+              </thead>
+              <motion.tbody className="divide-y divide-gray-50">
+                {filteredProducts.map((p, index) => (
+                  <motion.tr 
+                    key={p.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="hover:bg-gray-50/50"
+                  >
+                    {schemaFields.slice(0, 5).map((f: any) => (
+                      <td key={f.name} className="p-3 text-sm whitespace-nowrap">
+                        {f.name === 'Country' ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base leading-none">{getFlagEmoji(p.metadata.Country || 'US')}</span>
+                            <span className="font-medium">{p.metadata.Country === 'GB' ? 'UK' : p.metadata.Country}</span>
+                          </div>
+                        ) : (
+                          <span className="truncate max-w-[100px] block">{p.metadata[f.name] || '-'}</span>
+                        )}
+                      </td>
+                    ))}
+                    <td className="p-3 text-sm font-bold whitespace-nowrap">${p.price_usd}</td>
+                    <td className="p-3 text-right sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                      <button onClick={() => { haptic.medium(); setSelectedProduct(p); }} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-transform">Buy</button>
                     </td>
-                  ))}
-                  <td className="p-3 text-sm font-bold">${p.price_usd}</td>
-                  <td className="p-3 text-right">
-                    <button onClick={() => { haptic.medium(); setSelectedProduct(p); }} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-transform">Buy</button>
-                  </td>
-                </motion.tr>
-              ))}
-            </motion.tbody>
-          </table>
+                  </motion.tr>
+                ))}
+              </motion.tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="px-4 pt-2 space-y-3 w-full max-w-full">

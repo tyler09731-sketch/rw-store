@@ -17,7 +17,7 @@ export function getFlagEmoji(countryName: string) {
     'austria': 'AT', 'poland': 'PL'
   }
 
-  let isoCode = dictionary[cleanName]
+  let isoCode: string | undefined = dictionary[cleanName]
 
   // 2. If dictionary fails, try the library
   if (!isoCode) {

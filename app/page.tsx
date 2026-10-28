@@ -83,18 +83,22 @@ export default function Storefront() {
 
   const categories = ['All', ...new Set(products.map(p => p.category))]
   const activeSchema = schemas.find(s => s.category === activeCategory)
-  const isTableView = activeSchema?.default_view === 'table'
+  
+  // FIX: Only use Table view if we are in a specific category (not "All") AND the schema says it's a table.
+  const isTableView = activeCategory !== 'All' && activeSchema?.default_view === 'table'
 
   // Filterable fields
   const filterableFields = useMemo(() => {
-    if (!activeSchema || !activeSchema.fields) return []
+    // Only show filters for table views (like CC Info), not for the general store or cards.
+    if (!isTableView || !activeSchema || !activeSchema.fields) return []
+    
     return activeSchema.fields.filter((field: any) => {
       if (['Exp', 'Address', 'Email', 'Seller', 'BIN', 'Balance'].includes(field.name)) return false
       const categoryProducts = products.filter(p => p.category === activeCategory)
       const values = new Set(categoryProducts.map(p => p.metadata[field.name]).filter(Boolean))
       return values.size >= 1
     })
-  }, [activeSchema, products, activeCategory])
+  }, [isTableView, activeSchema, products, activeCategory])
 
   const getFilterOptions = (fieldName: string) => {
     const categoryProducts = products.filter(p => p.category === activeCategory)
@@ -168,7 +172,7 @@ export default function Storefront() {
         </div>
 
         {/* Horizontal Dynamic Filters */}
-        {isTableView && filterableFields.length > 0 && (
+        {filterableFields.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1">
             <div className="flex items-center gap-1 text-gray-500 mr-1">
               <SlidersHorizontal size={14} />
@@ -221,6 +225,7 @@ export default function Storefront() {
           )}
         </div>
       ) : isTableView ? (
+        /* TABLE VIEW (Only shows when a specific category like CC Info is selected) */
         <div className="px-4 pt-2 overflow-x-auto">
           <table className="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
@@ -262,7 +267,7 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
-        /* PREMIUM CARD VIEW */
+        /* PREMIUM CARD VIEW (Shows on "All" tab and Card categories) */
         <div className="px-4 pt-2 space-y-3">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (
@@ -293,7 +298,7 @@ export default function Storefront() {
 
                 <div className="my-3">
                   <p className="text-green-600 font-extrabold text-2xl tracking-tight">
-                    {product.metadata.Balance ? `$${product.metadata.Balance}` : 'Digital Item'}
+                    {product.metadata.Balance ? product.metadata.Balance : 'Digital Item'}
                   </p>
                   {product.metadata.Description && <p className="text-xs font-medium text-gray-500 mt-1">{product.metadata.Description}</p>}
                   

@@ -80,9 +80,9 @@ export default function Storefront() {
   const categories = ['All', 'Banks', 'CC Info']
   const isTableView = activeCategory === 'CC Info'
 
-  // Balance is back in the columns
-  const ccColumns = ['BIN', 'Exp', 'Country', 'State', 'Bank', 'Level', 'Network', 'Balance', 'Address', 'Email']
-  const ccFilters = ['Country', 'State', 'Bank', 'Level', 'Network']
+  // State removed. Balance stays.
+  const ccColumns = ['BIN', 'Exp', 'Country', 'Bank', 'Level', 'Network', 'Balance', 'Address', 'Email']
+  const ccFilters = ['Country', 'Bank', 'Level', 'Network']
 
   const formatExp = (exp: string) => {
     if (!exp) return '-'
@@ -141,7 +141,8 @@ export default function Storefront() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900 w-full max-w-full overflow-x-hidden relative">
-      <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-2 w-full max-w-full">
+      {/* HEADER: z-20 ensures it stays above the table's sticky button */}
+      <div className="sticky top-0 z-20 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-2 w-full max-w-full">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm">RW</div>
@@ -224,7 +225,8 @@ export default function Storefront() {
             <span>← Swipe to see details →</span>
           </div>
           
-          <div className="overflow-x-auto w-full pb-20">
+          {/* Table Wrapper: z-0 so it stays below the sticky header */}
+          <div className="overflow-x-auto w-full pb-20 relative z-0">
             <table className="w-full relative text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
                 <tr>
@@ -267,6 +269,8 @@ export default function Storefront() {
                       </td>
                     ))}
                     <td className="p-3 text-sm font-bold whitespace-nowrap text-orange-600">${p.price_usd.toFixed(2)}</td>
+                    
+                    {/* Sticky Buy Button: z-10 to stay below header but above table cells */}
                     <td className="p-3 text-right sticky right-0 z-10 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                       <button onClick={() => { haptic.medium(); setSelectedProduct(p); }} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-transform">Buy</button>
                     </td>

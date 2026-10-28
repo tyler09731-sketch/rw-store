@@ -70,14 +70,18 @@ export default function Storefront() {
     initTelegram()
   }, [])
 
+  // FIXED: Reset filters on category change
   useEffect(() => {
     setActiveFilters({})
   }, [activeCategory])
 
-  const categories = ['All', ...new Set(products.map(p => p.category))]
+  // FIXED: Hardcoded categories
+  const categories = ['All', 'Banks', 'CC Info']
   
   const activeSchema = schemas.find(s => s.category === activeCategory)
-  const isTableView = activeCategory !== 'All' && activeSchema?.default_view === 'table'
+  
+  // FIXED: Strict view logic
+  const isTableView = activeCategory === 'CC Info'
 
   const filterableFields = useMemo(() => {
     if (!isTableView || !activeSchema || !activeSchema.fields) return []
@@ -128,7 +132,6 @@ export default function Storefront() {
   if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} setActiveTab={setActiveTab} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
 
   return (
-    // THE FIX: w-full max-w-full overflow-x-hidden
     <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900 w-full max-w-full overflow-x-hidden relative">
       <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-md px-4 pt-6 pb-2 w-full max-w-full">
         <div className="flex items-center justify-between mb-4">
@@ -154,7 +157,6 @@ export default function Storefront() {
           <input type="text" placeholder="Search everything..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-xl shadow-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm" />
         </div>
 
-        {/* Category Tabs - clamped scroll */}
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
           {categories.map((cat) => (
             <button key={cat} onClick={() => { haptic.light(); setActiveCategory(cat); }} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${activeCategory === cat ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-white text-gray-600 border border-gray-100'}`}>
@@ -163,7 +165,6 @@ export default function Storefront() {
           ))}
         </div>
 
-        {/* Filters - clamped scroll */}
         {isTableView && filterableFields.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center mt-1 w-full max-w-full">
             <div className="flex items-center gap-1 text-gray-500 mr-1 shrink-0">
@@ -216,7 +217,6 @@ export default function Storefront() {
           )}
         </div>
       ) : isTableView ? (
-        // THE FIX: Table View - bounded scroll only inside this container
         <div className="px-4 pt-2 w-full max-w-full overflow-x-auto">
           <table className="w-full min-w-[500px] text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
@@ -258,7 +258,6 @@ export default function Storefront() {
           </table>
         </div>
       ) : (
-        // THE FIX: Card View - bounded width
         <div className="px-4 pt-2 space-y-3 w-full max-w-full">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (

@@ -67,7 +67,6 @@ export default function Storefront() {
   const [detailProduct, setDetailProduct] = useState<Product | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('items')
   const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string, balance?: number } | null>(null)
-  const [orderCount, setOrderCount] = useState(0)
   const [vaultUnlocked, setVaultUnlocked] = useState(false)
   
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
@@ -78,12 +77,10 @@ export default function Storefront() {
     setLoading(true)
     try {
       const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).eq('is_vault_only', false).order('created_at', { ascending: false })
-      const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'confirmed')
       if (prods) {
         setProducts(prods)
         setShuffledAllProducts(shuffleArray(prods))
       }
-      if (count) setOrderCount(count)
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -181,12 +178,11 @@ export default function Storefront() {
             <h1 className="font-bold text-xl tracking-tight">Store 2.0</h1>
           </div>
           <div className="flex items-center gap-2">
-            {orderCount > 0 && (
-              <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-full shadow-sm border border-gray-100 text-xs font-medium">
-                <CheckCircle2 size={12} className="text-green-500" />
-                {orderCount} delivered
-              </div>
-            )}
+            {/* REPLACED: Total product count */}
+            <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-full shadow-sm border border-gray-100 text-xs font-medium">
+              <Package size={12} className="text-orange-500" />
+              {data?.products?.length || products.length} products
+            </div>
             <button onClick={() => { haptic.light(); fetchData(); }} className="p-2.5 bg-white rounded-full shadow-sm border border-gray-100 active:scale-95 transition-transform">
               <RotateCw size={18} className="text-gray-600" />
             </button>
@@ -305,11 +301,16 @@ export default function Storefront() {
         <div className="px-4 pt-2 space-y-3 w-full max-w-full">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (
-              <motion.div key={product.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2, delay: index * 0.05 }} className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative">
-                <div className="absolute top-4 right-4 flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100">
-                  <span className="text-[10px]">🔥</span>
-                  <span className="text-[10px] font-bold">1 left</span>
-                </div>
+              <motion.div 
+                key={product.id} 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.95 }} 
+                transition={{ duration: 0.2, delay: index * 0.05 }} 
+                className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative"
+              >
+                {/* REMOVED: 1 left badge */}
+
                 <div className="flex items-start gap-3 mb-3">
                   {product.image_url ? (
                     <Image src={product.image_url} alt={product.title} width={48} height={48} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
@@ -317,10 +318,11 @@ export default function Storefront() {
                     <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-base text-gray-900 leading-tight truncate pr-12">{product.title}</h3>
+                    <h3 className="font-bold text-base text-gray-900 leading-tight truncate">{product.title}</h3>
                     <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">{product.category}</span>
                   </div>
                 </div>
+
                 <div className="my-3">
                   <p className="text-green-600 font-extrabold text-3xl tracking-tight leading-none">
                     {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
@@ -329,6 +331,7 @@ export default function Storefront() {
                     <p className="text-xs text-gray-500 mt-1 font-medium">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
                   )}
                 </div>
+
                 <div className="flex flex-wrap gap-1.5 mb-4">
                   {Object.entries(product.metadata)
                     .filter(([key]) => ['Level', 'Network', 'Bank'].includes(key))
@@ -336,6 +339,7 @@ export default function Storefront() {
                       <span key={key} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md">{value}</span>
                     ))}
                 </div>
+
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
                   <div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p>

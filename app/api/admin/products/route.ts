@@ -18,12 +18,19 @@ export async function GET(req: Request) {
   const { data: products } = await supabaseAdmin.from('products').select('*').order('created_at', { ascending: false })
   const { count: userCount } = await supabaseAdmin.from('users').select('*', { count: 'exact', head: true })
   const { count: orderCount } = await supabaseAdmin.from('orders').select('*', { count: 'exact', head: true })
+  
+  // NEW: Fetch traffic sources for the admin dashboard
+  const { data: sources } = await supabaseAdmin
+    .from('users')
+    .select('source')
+    .not('source', 'is', null)
 
   return NextResponse.json({
     schemas: schemas || [],
     products: products || [],
     userCount: userCount || 0,
-    orderCount: orderCount || 0
+    orderCount: orderCount || 0,
+    sources: sources || [] // <-- ADDED THIS
   })
 }
 
@@ -62,7 +69,6 @@ export async function POST(req: Request) {
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
 
-// Handle Editing a Product (PUT)
 export async function PUT(req: Request) {
   const body = await req.json()
   const { password, id, ...data } = body
@@ -83,7 +89,6 @@ export async function PUT(req: Request) {
   return NextResponse.json({ success: true })
 }
 
-// Handle Toggling Sold Status (PATCH)
 export async function PATCH(req: Request) {
   const body = await req.json()
   const { password, id, is_sold } = body
@@ -93,7 +98,6 @@ export async function PATCH(req: Request) {
   }
 
   const { error } = await supabaseAdmin.from('products').update({ is_sold }).eq('id', id)
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

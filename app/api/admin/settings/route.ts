@@ -6,14 +6,12 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SECRET_KEY!
 )
 
-// GET settings (used by Mini App + Admin)
 export async function GET() {
   const { data, error } = await supabaseAdmin.from('app_settings').select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
 
-// UPDATE settings (Admin only)
 export async function POST(req: Request) {
   const body = await req.json()
   const { password, support_url, proofs_url, guides_url } = body

@@ -263,7 +263,7 @@ export default function Storefront() {
               <button key={p.id} onClick={() => { haptic.medium(); setDetailProduct(p); }} className="bg-gray-900 rounded-2xl p-4 min-w-[200px] text-left shrink-0 border border-gray-800 shadow-lg">
                 <div className="flex items-center gap-2 mb-2">
                   {p.image_url ? (
-                    <img src={p.image_url} alt={p.title} className="w-6 h-6 rounded-md object-cover" />
+                    <img src={p.image_url} alt={p.title} loading="lazy" className="w-6 h-6 rounded-md object-cover" />
                   ) : (
                     <div className="w-6 h-6 bg-orange-500/20 rounded-md flex items-center justify-center text-orange-400 text-xs font-bold">RW</div>
                   )}
@@ -361,7 +361,7 @@ export default function Storefront() {
                   <div className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative">
                     <div className="flex items-start gap-3 mb-3">
                       {product.image_url ? (
-                        <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
+                        <img src={product.image_url} alt={product.title} loading="lazy" className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
                       ) : (
                         <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
                       )}

@@ -26,18 +26,33 @@ export default function TopUpModal({ onClose, userId }: { onClose: () => void, u
   }
 
   const handleCopy = () => {
+    if (!selectedMethod?.wallet_address) return
     navigator.clipboard.writeText(selectedMethod.wallet_address)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleSelectMethod = (m: any) => {
+    if (!m || !m.wallet_address) {
+      alert('This payment method is not configured. Contact support.')
+      return
+    }
+    setSelectedMethod(m)
+    setStep('pay')
+  }
+
   const handleSubmit = async () => {
-    if (!txHash.trim() || !amount || !selectedMethod) return
+    if (!txHash.trim() || !amount || !selectedMethod || !userId) return
     setLoading(true)
     await fetch('/api/topups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, amount, crypto_coin: `${selectedMethod.name} ${selectedMethod.network || ''}`.trim(), tx_hash: txHash })
+      body: JSON.stringify({
+        user_id: userId,
+        amount,
+        crypto_coin: `${selectedMethod.name} ${selectedMethod.network || ''}`.trim(),
+        tx_hash: txHash
+      })
     })
     setLoading(false)
     setStep('submitted')
@@ -49,7 +64,11 @@ export default function TopUpModal({ onClose, userId }: { onClose: () => void, u
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             {step !== 'amount' && step !== 'submitted' && (
-              <button onClick={() => { if (step === 'select') setStep('amount'); if (step === 'pay') setStep('select'); if (step === 'hash') setStep('pay') }} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full"><ChevronLeft size={20} /></button>
+              <button onClick={() => {
+                if (step === 'select') setStep('amount')
+                if (step === 'pay') setStep('select')
+                if (step === 'hash') setStep('pay')
+              }} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full"><ChevronLeft size={20} /></button>
             )}
             <h2 className="text-xl font-bold">{step === 'submitted' ? 'Request Sent' : step === 'amount' ? 'Top Up' : step === 'select' ? 'Select Coin' : 'Complete'}</h2>
           </div>
@@ -69,21 +88,19 @@ export default function TopUpModal({ onClose, userId }: { onClose: () => void, u
               <div className="space-y-4">
                 <div className="text-center py-6">
                   <p className="text-sm text-gray-500 mb-2">Enter amount to add</p>
-                  <div className="flex items-center justify-center gap-2"><span className="text-4xl font-bold text-gray-400">$</span><input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="text-5xl font-bold text-gray-900 w-40 text-center focus:outline-none" /></div>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-4xl font-bold text-gray-400">$</span>
+                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="text-5xl font-bold text-gray-900 w-40 text-center focus:outline-none" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">{[20, 50, 100].map(val => (<button key={val} onClick={() => setAmount(val.toString())} className="bg-gray-50 border border-gray-200 py-2 rounded-lg text-sm font-semibold">${val}</button>))}</div>
                 <button onClick={() => setStep('select')} disabled={!amount || parseFloat(amount) <= 0} className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold disabled:opacity-50 mt-4 flex items-center justify-center gap-2"><Wallet size={18} /> Continue</button>
               </div>
             )}
 
-            {step === 'select' && (
-              <CryptoSelector 
-                selectedId={selectedMethod?.id || null}
-                onSelect={(m) => { setSelectedMethod(m); setStep('pay') }} 
-              />
-            )}
+            {step === 'select' && <CryptoSelector selectedId={selectedMethod?.id || null} onSelect={handleSelectMethod} />}
 
-            {step === 'pay' && selectedMethod && (
+            {step === 'pay' && selectedMethod?.wallet_address && (
               <div className="space-y-4">
                 <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex justify-between border border-orange-100"><span className="text-sm font-medium">Rate locked</span><span className="font-bold font-mono">{formatTime(timeLeft)}</span></div>
                 <div className="text-center py-4"><p className="text-sm text-gray-500">Send exactly</p><p className="text-2xl font-bold">${parseFloat(amount).toFixed(2)}</p><p className="text-sm text-orange-500">in {selectedMethod.name} {selectedMethod.network}</p></div>
@@ -93,6 +110,13 @@ export default function TopUpModal({ onClose, userId }: { onClose: () => void, u
                   <button onClick={handleCopy} className="mt-3 w-full flex items-center justify-center gap-2 bg-white border py-2.5 rounded-lg font-semibold text-sm">{copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}{copied ? 'Copied!' : 'Copy'}</button>
                 </div>
                 <button onClick={() => setStep('hash')} className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold">I've Sent Payment</button>
+              </div>
+            )}
+
+            {step === 'pay' && !selectedMethod?.wallet_address && (
+              <div className="text-center py-8">
+                <p className="text-sm text-red-500">This payment method is missing a wallet address.</p>
+                <button onClick={() => setStep('select')} className="mt-4 text-orange-500 font-bold text-sm">Go Back</button>
               </div>
             )}
 

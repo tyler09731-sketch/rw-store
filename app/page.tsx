@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useDeferredValue } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
-import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X, SlidersHorizontal } from 'lucide-react'
+import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X, SlidersHorizontal, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { getFlagEmoji } from '@/lib/getFlag'
 import { haptic } from '@/lib/haptics'
@@ -25,6 +26,25 @@ type Product = {
 }
 
 type Tab = 'items' | 'orders' | 'wallet' | 'profile'
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-3xl p-5 border border-gray-100 animate-pulse">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-12 h-12 bg-gray-200 rounded-xl"></div>
+        <div className="flex-1">
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+          <div className="h-3 bg-gray-100 rounded w-1/2"></div>
+        </div>
+      </div>
+      <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+      <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+        <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-10 bg-gray-200 rounded-xl w-24"></div>
+      </div>
+    </div>
+  )
+}
 
 export default function Storefront() {
   const [products, setProducts] = useState<Product[]>([])
@@ -98,7 +118,8 @@ export default function Storefront() {
   const filteredProducts = products.filter(p => {
     const searchString = `${p.title} ${JSON.stringify(p.metadata)}`.toLowerCase()
     const matchesSearch = searchString.includes(deferredSearch.toLowerCase())
-    if (activeCategory === 'All') { if (p.category !== 'Banks') return false } else if (activeCategory !== p.category) { return false }
+    const matchesCategory = activeCategory === 'All' || p.category === activeCategory
+    if (!matchesCategory) return false
     if (!isTableView) return matchesSearch
     const matchesFilters = Object.entries(activeFilters).every(([key, value]) => { if (!value) return true; return p.metadata[key] === value })
     return matchesSearch && matchesFilters
@@ -112,6 +133,8 @@ export default function Storefront() {
     setActiveFilters(prev => { const next = { ...prev }; if (value === '') { delete next[fieldName] } else { next[fieldName] = value }; return next })
     setFilterModal(null)
   }
+
+  const featuredProducts = products.slice(0, 3)
 
   if (activeTab === 'orders') return <><OrdersPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
   if (activeTab === 'wallet') return <><WalletPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
@@ -170,8 +193,41 @@ export default function Storefront() {
 
       <ActivityTicker />
 
+      {activeCategory === 'All' && !loading && featuredProducts.length > 0 && (
+        <div className="px-4 pt-4 pb-2">
+          <div className="flex items-center gap-1 mb-2">
+            <Zap size={14} className="text-orange-500" />
+            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Fresh Drops</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {featuredProducts.map((p) => (
+              <button 
+                key={p.id}
+                onClick={() => { haptic.medium(); setDetailProduct(p); }}
+                className="bg-gray-900 rounded-2xl p-4 min-w-[200px] text-left shrink-0 border border-gray-800 shadow-lg"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  {p.image_url ? (
+                    <Image src={p.image_url} alt={p.title} width={24} height={24} className="w-6 h-6 rounded-md object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 bg-orange-500/20 rounded-md flex items-center justify-center text-orange-400 text-xs font-bold">RW</div>
+                  )}
+                  <span className="text-[10px] font-bold text-orange-400 uppercase">{p.category}</span>
+                </div>
+                <p className="text-white font-bold text-sm truncate mb-1">{p.title}</p>
+                <p className="text-green-400 font-bold text-lg">{formatPrice(p.price_usd)}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading ? (
-        <div className="flex justify-center py-20"><RotateCw className="animate-spin text-orange-500" /></div>
+        <div className="px-4 pt-2 space-y-3 w-full max-w-full">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
           <p>No products found.</p>
@@ -221,30 +277,60 @@ export default function Storefront() {
         <div className="px-4 pt-2 space-y-3 w-full max-w-full">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (
-              <motion.div key={product.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2, delay: index * 0.05 }} className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-3">
-                    {product.image_url ? (
-                      <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
-                    ) : (
-                      <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
-                    )}
-                    <div><h3 className="font-bold text-base text-gray-900 leading-tight">{product.title}</h3><span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">{product.category}</span></div>
-                  </div>
-                  <ChevronRight className="text-gray-300" size={20} />
+              <motion.div 
+                key={product.id} 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.95 }} 
+                transition={{ duration: 0.2, delay: index * 0.05 }} 
+                className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative"
+              >
+                {/* Urgency Badge */}
+                <div className="absolute top-4 right-4 flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100">
+                  <span className="text-[10px]">🔥</span>
+                  <span className="text-[10px] font-bold">1 left</span>
                 </div>
+
+                <div className="flex items-start gap-3 mb-3">
+                  {product.image_url ? (
+                    <Image src={product.image_url} alt={product.title} width={48} height={48} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
+                  ) : (
+                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-base text-gray-900 leading-tight truncate pr-12">{product.title}</h3>
+                    <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">{product.category}</span>
+                  </div>
+                </div>
+
+                {/* Balance Hero */}
                 <div className="my-3">
-                  <p className="text-green-600 font-extrabold text-2xl tracking-tight">{product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}</p>
-                  {product.metadata.Description && <p className="text-xs font-medium text-gray-500 mt-1">{product.metadata.Description}</p>}
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {Object.entries(product.metadata).filter(([key]) => ['Level', 'Network', 'Bank'].includes(key)).map(([key, value]: [string, any]) => (
+                  <p className="text-green-600 font-extrabold text-3xl tracking-tight leading-none">
+                    {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
+                  </p>
+                  {product.metadata.BIN && (
+                    <p className="text-xs text-gray-500 mt-1 font-medium">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
+                  )}
+                </div>
+
+                {/* Badges */}
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {Object.entries(product.metadata)
+                    .filter(([key]) => ['Level', 'Network', 'Bank'].includes(key))
+                    .map(([key, value]: [string, any]) => (
                       <span key={key} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md">{value}</span>
                     ))}
-                  </div>
                 </div>
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
-                  <div><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p><p className="text-2xl font-extrabold text-gray-900">{formatPrice(product.price_usd)}</p></div>
-                  <button onClick={() => { haptic.medium(); setDetailProduct(product); }} className="bg-orange-500 text-white px-7 py-3 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2"><Package size={16} /> View</button>
+
+                {/* Price + CTA */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p>
+                    <p className="text-xl font-extrabold text-gray-900">{formatPrice(product.price_usd)}</p>
+                  </div>
+                  <button onClick={() => { haptic.medium(); setDetailProduct(product); }} className="bg-orange-500 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2">
+                    <Package size={16} /> View
+                  </button>
                 </div>
               </motion.div>
             ))}

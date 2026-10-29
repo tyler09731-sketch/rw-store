@@ -181,7 +181,7 @@ export default function Storefront() {
             {/* REPLACED: Total product count */}
             <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-full shadow-sm border border-gray-100 text-xs font-medium">
               <Package size={12} className="text-orange-500" />
-              {data?.products?.length || products.length} products
+              {products.length} products
             </div>
             <button onClick={() => { haptic.light(); fetchData(); }} className="p-2.5 bg-white rounded-full shadow-sm border border-gray-100 active:scale-95 transition-transform">
               <RotateCw size={18} className="text-gray-600" />

@@ -12,6 +12,7 @@ type Product = {
   price_usd: number
   image_url: string | null
   metadata: any
+  is_sold: boolean
 }
 
 export default function ProductDetailSheet({ 
@@ -23,7 +24,6 @@ export default function ProductDetailSheet({
   onClose: () => void
   onBuy: (product: Product) => void 
 }) {
-  // Configure Telegram MainButton
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     if (!tg?.MainButton || !product) return

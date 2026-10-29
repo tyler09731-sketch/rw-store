@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, Clock, ArrowLeft } from 'lucide-react'
+import { Wallet, Plus, ArrowUpRight, Clock, ArrowLeft, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import TopUpModal from '@/components/TopUpModal'
 
@@ -9,19 +9,34 @@ export default function WalletPage({ user, onBack }: { user: any, onBack: () => 
   const [showTopUp, setShowTopUp] = useState(false)
   const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [currentBalance, setCurrentBalance] = useState(user?.balance || 0)
+
+  const fetchHistory = async () => {
+    if (!user?.id) return
+    const { data } = await supabase
+      .from('orders')
+      .select('*, products(title)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+    
+    if (data) setHistory(data)
+    setLoading(false)
+  }
+
+  const refreshBalance = async () => {
+    if (!user?.id) return
+    setRefreshing(true)
+    const { data } = await supabase
+      .from('users')
+      .select('balance')
+      .eq('telegram_id', user.id)
+      .single()
+    if (data) setCurrentBalance(data.balance || 0)
+    setRefreshing(false)
+  }
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      if (!user?.id) return
-      const { data } = await supabase
-        .from('orders')
-        .select('*, products(title)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-      
-      if (data) setHistory(data)
-      setLoading(false)
-    }
     fetchHistory()
   }, [user])
 
@@ -38,13 +53,17 @@ export default function WalletPage({ user, onBack }: { user: any, onBack: () => 
         
         {/* Balance Card */}
         <div className="bg-gray-900 rounded-3xl p-6 shadow-xl relative overflow-hidden">
-          {/* Decorative background circle */}
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-orange-500/20 rounded-full blur-2xl"></div>
           
           <div className="relative z-10">
-            <p className="text-sm text-gray-400 font-medium mb-1">Available Balance</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm text-gray-400 font-medium">Available Balance</p>
+              <button onClick={refreshBalance} className="p-1 text-gray-400 hover:text-white">
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              </button>
+            </div>
             <p className="text-4xl font-bold text-white mb-6">
-              ${user?.balance?.toFixed(2) || '0.00'}
+              ${currentBalance?.toFixed(2) || '0.00'}
             </p>
             <button 
               onClick={() => setShowTopUp(true)}
@@ -79,7 +98,7 @@ export default function WalletPage({ user, onBack }: { user: any, onBack: () => 
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-sm">-${item.price_usd || '0.00'}</p>
+                    <p className="font-bold text-sm">-${Math.floor(item.price_usd || 0)}</p>
                     <p className="text-xs text-green-500 font-medium">Completed</p>
                   </div>
                 </div>
@@ -90,7 +109,7 @@ export default function WalletPage({ user, onBack }: { user: any, onBack: () => 
 
       </div>
 
-      {showTopUp && <TopUpModal onClose={() => setShowTopUp(false)} />}
+      {showTopUp && <TopUpModal onClose={() => { setShowTopUp(false); refreshBalance(); }} userId={user?.id} />}
     </div>
   )
 }

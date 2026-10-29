@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3 } from 'lucide-react'
+import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3, UserX, UserCheck } from 'lucide-react'
 import { Country, State } from 'country-state-city'
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/dropzone'
 import { useSupabaseUpload } from '@/hooks/use-supabase-upload'
@@ -15,41 +15,40 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [data, setData] = useState<any>(null)
   const [orders, setOrders] = useState<any[]>([])
+  const [usersList, setUsersList] = useState<any[]>([])
+  const [topups, setTopups] = useState<any[]>([])
   const [settings, setSettings] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'settings'>('inventory')
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'settings'>('inventory')
+  
+  const [balanceInputs, setBalanceInputs] = useState<Record<number, string>>({})
 
-  // UI States
   const [showCatForm, setShowCatForm] = useState(false)
   const [showProdForm, setShowProdForm] = useState(false)
   
-  // Category Form State
   const [newCatName, setNewCatName] = useState('')
   const [newCatView, setNewCatView] = useState('card')
   const [newCatFields, setNewCatFields] = useState<string[]>([''])
   const [newCatHasImage, setNewCatHasImage] = useState(false)
 
-  // Product Form State
   const [editId, setEditId] = useState<number | null>(null)
   const [prodTitle, setProdTitle] = useState('')
   const [prodCategory, setProdCategory] = useState('')
   const [prodPrice, setProdPrice] = useState('')
   const [prodImage, setProdImage] = useState('')
   const [prodFields, setProdFields] = useState<Record<string, string>>({})
+  const [prodDeliveryInfo, setProdDeliveryInfo] = useState('') // <-- NEW
   const [selectedCountryCode, setSelectedCountryCode] = useState('')
 
-  // Settings Form State
   const [supportUrl, setSupportUrl] = useState('')
   const [proofsUrl, setProofsUrl] = useState('')
   const [guidesUrl, setGuidesUrl] = useState('')
 
-  // Geo Data
   const countries = Country.getAllCountries()
   const availableStates = selectedCountryCode ? State.getStatesOfCountry(selectedCountryCode) : []
   const hasStates = availableStates.length > 0
 
-  // Dropzone
   const uploadProps = useSupabaseUpload({
     bucketName: 'product-images',
     path: 'bank-logos',
@@ -86,6 +85,22 @@ export default function AdminPage() {
     }
   }
 
+  const fetchUsers = async () => {
+    const res = await fetch(`/api/admin/users?password=${password}`)
+    if (res.ok) {
+      const userData = await res.json()
+      setUsersList(userData.users || [])
+    }
+  }
+
+  const fetchTopups = async () => {
+    const res = await fetch(`/api/topups?password=${password}`)
+    if (res.ok) {
+      const d = await res.json()
+      setTopups(d.topups || [])
+    }
+  }
+
   const fetchSettings = async () => {
     const res = await fetch('/api/admin/settings')
     if (res.ok) {
@@ -102,31 +117,38 @@ export default function AdminPage() {
     setLoading(true)
     await fetchData()
     await fetchOrders()
+    await fetchUsers()
+    await fetchTopups()
     await fetchSettings()
     setLoading(false)
   }
 
-  const handleSaveSettings = async () => {
-    const res = await fetch('/api/admin/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, support_url: supportUrl, proofs_url: proofsUrl, guides_url: guidesUrl })
-    })
-    if (res.ok) {
-      alert('Settings saved successfully')
-      fetchSettings()
+  const handleToggleBan = async (telegram_id: number, is_blocked: boolean) => {
+    const action = is_blocked ? 'Unban' : 'Ban'
+    if (confirm(`${action} this user?`)) {
+      await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, telegram_id, is_blocked: !is_blocked })
+      })
+      fetchUsers()
     }
   }
 
+  const handleUpdateBalance = async (telegram_id: number) => {
+    const newBal = parseFloat(balanceInputs[telegram_id] || '0')
+    if (isNaN(newBal)) { alert('Invalid number'); return }
+    await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, telegram_id, balance: newBal }) })
+    fetchUsers()
+  }
+
+  const handleSaveSettings = async () => {
+    const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, support_url: supportUrl, proofs_url: proofsUrl, guides_url: guidesUrl }) })
+    if (res.ok) { alert('Settings saved successfully'); fetchSettings() }
+  }
+
   const resetForm = () => {
-    setEditId(null)
-    setProdTitle('')
-    setProdPrice('')
-    setProdImage('')
-    setProdFields({})
-    setSelectedCountryCode('')
-    setShowProdForm(false)
-    uploadProps.setFiles([])
+    setEditId(null); setProdTitle(''); setProdPrice(''); setProdImage(''); setProdFields({}); setProdDeliveryInfo(''); setSelectedCountryCode(''); setShowProdForm(false); uploadProps.setFiles([])
   }
 
   const handleEditClick = (product: any) => {
@@ -136,6 +158,7 @@ export default function AdminPage() {
     setProdPrice(product.price_usd.toString())
     setProdImage(product.image_url || '')
     setProdFields(product.metadata || {})
+    setProdDeliveryInfo(product.delivery_info || '') // <-- NEW
     setSelectedCountryCode(product.metadata?.Country || '')
     setShowProdForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -144,26 +167,20 @@ export default function AdminPage() {
   const handleSaveProduct = async () => {
     const finalMetadata = { ...prodFields }
     if (selectedCountryCode) finalMetadata['Country'] = selectedCountryCode
-
-    const payload = {
-      password, title: prodTitle, category: prodCategory, price_usd: prodPrice, image_url: prodImage, metadata: finalMetadata
+    const payload = { 
+      password, title: prodTitle, category: prodCategory, price_usd: prodPrice, 
+      image_url: prodImage, metadata: finalMetadata, delivery_info: prodDeliveryInfo // <-- NEW
     }
-
     if (editId) {
       await fetch('/api/admin/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: editId }) })
     } else {
       await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, action: 'add_product' }) })
     }
-    resetForm()
-    fetchData()
+    resetForm(); fetchData()
   }
 
   const handleToggleSold = async (id: number, currentStatus: boolean) => {
-    await fetch('/api/admin/products', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, id, is_sold: !currentStatus })
-    })
+    await fetch('/api/admin/products', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id, is_sold: !currentStatus }) })
     fetchData()
   }
 
@@ -176,26 +193,21 @@ export default function AdminPage() {
 
   const handleAddCategory = async () => {
     const fields = newCatFields.filter(f => f.trim() !== '').map(f => ({ name: f, type: 'text' }))
-    await fetch('/api/admin/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, action: 'add_category', category: newCatName, fields, default_view: newCatView, has_image: newCatHasImage })
-    })
-    setShowCatForm(false)
-    setNewCatName('')
-    setNewCatFields([''])
-    setNewCatHasImage(false)
-    fetchData()
+    await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, action: 'add_category', category: newCatName, fields, default_view: newCatView, has_image: newCatHasImage }) })
+    setShowCatForm(false); setNewCatName(''); setNewCatFields(['']); setNewCatHasImage(false); fetchData()
   }
 
+  // UPDATED: Auto-fill the textarea with the product's delivery_info
   const handleConfirmOrder = async (orderId: number, deliveryInfo: string) => {
     if (!deliveryInfo.trim()) { alert('Please enter delivery info'); return }
-    const res = await fetch('/api/admin/orders', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, id: orderId, delivery_info: deliveryInfo })
-    })
+    const res = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id: orderId, delivery_info: deliveryInfo }) })
     if (res.ok) { alert('Order confirmed!'); fetchOrders() }
+  }
+
+  const handleTopupAction = async (id: number, action: 'approve' | 'reject') => {
+    await fetch('/api/topups', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id, action }) })
+    fetchTopups()
+    fetchData()
   }
 
   const selectedSchema = data?.schemas.find((s: any) => s.category === prodCategory)
@@ -222,22 +234,21 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans pb-20">
       <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
         
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4">
           <div className="flex items-center gap-3">
             <ShieldAlert className="text-orange-500" size={28} />
             <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
           </div>
           
-          {/* Tabs */}
-          <div className="flex bg-gray-800 p-1 rounded-xl border border-gray-700">
-            <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'inventory' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Inventory</button>
-            <button onClick={() => { setActiveTab('orders'); fetchOrders() }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Orders ({orders.filter(o => o.status === 'pending').length})</button>
-            <button onClick={() => { setActiveTab('settings'); fetchSettings() }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'settings' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Settings</button>
+          <div className="flex bg-gray-800 p-1 rounded-xl border border-gray-700 overflow-x-auto">
+            <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'inventory' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Inventory</button>
+            <button onClick={() => { setActiveTab('orders'); fetchOrders() }} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Orders ({orders.filter(o => o.status === 'pending').length})</button>
+            <button onClick={() => { setActiveTab('topups'); fetchTopups() }} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'topups' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Top-Ups ({topups.filter(t => t.status === 'pending').length})</button>
+            <button onClick={() => { setActiveTab('users'); fetchUsers() }} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'users' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Users</button>
+            <button onClick={() => { setActiveTab('settings'); fetchSettings() }} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'settings' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Settings</button>
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-gray-800 p-5 rounded-2xl border border-gray-700 flex items-center gap-4">
             <div className="p-3 bg-blue-900/30 rounded-xl"><Users className="text-blue-400" size={24} /></div>
@@ -253,17 +264,13 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* INVENTORY TAB */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
-            
-            {/* Action Buttons */}
             <div className="flex gap-3">
               <button onClick={() => setShowCatForm(!showCatForm)} className="flex items-center gap-2 text-sm font-semibold bg-gray-800 border border-gray-700 text-white px-4 py-2.5 rounded-lg hover:bg-gray-700 transition-colors"><Layers size={16} /> Add Category</button>
               <button onClick={() => { resetForm(); setShowProdForm(!showProdForm); }} className="flex items-center gap-2 text-sm font-semibold bg-orange-500 text-white px-4 py-2.5 rounded-lg hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><Plus size={16} /> Add Product</button>
             </div>
 
-            {/* Forms (Dark Mode) */}
             {showCatForm && (
               <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 space-y-4">
                 <h2 className="font-bold text-white text-lg">New Category</h2>
@@ -320,12 +327,24 @@ export default function AdminPage() {
                   if (field.name === 'Network') return <select key={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="">Select Network</option>{CARD_NETWORKS.map(net => <option key={net} value={net}>{net}</option>)}</select>
                   return <input key={field.name} placeholder={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
                 })}
+
+                {/* NEW: Delivery Info textarea */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Delivery Info (Account Credentials)</p>
+                  <textarea 
+                    value={prodDeliveryInfo} 
+                    onChange={e => setProdDeliveryInfo(e.target.value)} 
+                    placeholder="LOGIN: ... PASS: ... AN: ... RN: ..." 
+                    className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" 
+                    rows={4}
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">This info will auto-fill when you confirm an order for this product.</p>
+                </div>
                 
                 <button onClick={handleSaveProduct} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors mt-2 shadow-lg shadow-orange-500/20">{editId ? 'Update Product' : 'Save Product'}</button>
               </div>
             )}
 
-            {/* Inventory List */}
             <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
               <div className="p-4 border-b border-gray-700 bg-gray-800/50"><h2 className="font-bold text-white">Inventory ({data.products.length})</h2></div>
               <div className="divide-y divide-gray-700 max-h-[500px] overflow-y-auto">
@@ -344,32 +363,71 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ORDERS TAB */}
         {activeTab === 'orders' && (
           <div className="space-y-4">
             {orders.length === 0 ? (
               <div className="text-center py-20 text-gray-400 bg-gray-800 rounded-2xl border border-gray-700">No orders yet.</div>
             ) : (
-              orders.map((order) => (
-                <div key={order.id} className={`bg-gray-800 rounded-2xl border p-5 space-y-3 ${order.status === 'pending' ? 'border-yellow-700/50 bg-yellow-900/10' : 'border-green-700/50 bg-green-900/10'}`}>
-                  <div className="flex justify-between items-start">
-                    <div><h3 className="font-bold text-white">{order.products?.title || 'Unknown'}</h3><p className="text-xs text-gray-400">Ref: {order.order_ref}</p><p className="text-xs text-gray-400">TXID: {order.tx_hash || 'N/A'}</p></div>
+              orders.map((order) => {
+                // Auto-fill from the product's delivery_info
+                const productInfo = order.products?.delivery_info || ''
+                return (
+                  <div key={order.id} className={`bg-gray-800 rounded-2xl border p-5 space-y-3 ${order.status === 'pending' ? 'border-yellow-700/50 bg-yellow-900/10' : 'border-green-700/50 bg-green-900/10'}`}>
+                    <div className="flex justify-between items-start">
+                      <div><h3 className="font-bold text-white">{order.products?.title || 'Unknown'}</h3><p className="text-xs text-gray-400">Ref: {order.order_ref}</p><p className="text-xs text-gray-400">TXID: {order.tx_hash || 'N/A'}</p></div>
+                      {order.status === 'pending' ? (
+                        <span className="flex items-center gap-1 bg-yellow-900/50 text-yellow-400 text-xs font-bold px-2 py-1 rounded border border-yellow-700"><Clock size={12} /> Pending</span>
+                      ) : (
+                        <span className="flex items-center gap-1 bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded border border-green-700"><CheckCircle size={12} /> Delivered</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-300"><p>Price: <strong>${order.price_usd}</strong></p><p>Coin: {order.crypto_coin}</p></div>
+
                     {order.status === 'pending' ? (
-                      <span className="flex items-center gap-1 bg-yellow-900/50 text-yellow-400 text-xs font-bold px-2 py-1 rounded border border-yellow-700"><Clock size={12} /> Pending</span>
+                      <div className="pt-2 border-t border-gray-700">
+                        <p className="text-xs font-bold text-gray-400 uppercase mb-1">Delivery Details {productInfo && <span className="text-green-400">(Auto-filled)</span>}</p>
+                        <textarea 
+                          id={`delivery-${order.id}`} 
+                          defaultValue={productInfo} 
+                          placeholder="LOGIN: ... PASS: ..." 
+                          className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" 
+                          rows={3} 
+                        />
+                        <button onClick={() => { const el = document.getElementById(`delivery-${order.id}`) as HTMLTextAreaElement; handleConfirmOrder(order.id, el.value) }} className="mt-2 w-full bg-green-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">Confirm & Deliver</button>
+                      </div>
                     ) : (
-                      <span className="flex items-center gap-1 bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded border border-green-700"><CheckCircle size={12} /> Delivered</span>
+                      <div className="pt-2 border-t border-gray-700 bg-gray-900/50 p-3 rounded-lg"><p className="text-xs font-bold text-gray-400 uppercase mb-1">Delivered</p><pre className="text-xs font-mono text-green-400 whitespace-pre-wrap">{order.delivery_info}</pre></div>
                     )}
                   </div>
-                  <div className="text-sm text-gray-300"><p>Price: <strong>${order.price_usd}</strong></p><p>Coin: {order.crypto_coin}</p></div>
+                )
+              })
+            )}
+          </div>
+        )}
 
-                  {order.status === 'pending' ? (
-                    <div className="pt-2 border-t border-gray-700">
-                      <p className="text-xs font-bold text-gray-400 uppercase mb-1">Paste Delivery Details</p>
-                      <textarea id={`delivery-${order.id}`} placeholder="LOGIN: ... PASS: ..." className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" rows={3} />
-                      <button onClick={() => { const el = document.getElementById(`delivery-${order.id}`) as HTMLTextAreaElement; handleConfirmOrder(order.id, el.value) }} className="mt-2 w-full bg-green-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">Confirm & Deliver</button>
+        {activeTab === 'topups' && (
+          <div className="space-y-4">
+            {topups.length === 0 ? (
+              <div className="text-center py-20 text-gray-400 bg-gray-800 rounded-2xl border border-gray-700">No top-up requests.</div>
+            ) : (
+              topups.map((t: any) => (
+                <div key={t.id} className={`bg-gray-800 rounded-2xl border p-5 space-y-3 ${t.status === 'pending' ? 'border-yellow-700/50' : t.status === 'confirmed' ? 'border-green-700/50' : 'border-red-700/50'}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold text-white">${t.amount} in {t.crypto_coin}</h3>
+                      <p className="text-xs text-gray-400">User: @{t.users?.username || 'unknown'} ({t.user_id})</p>
+                      <p className="text-xs text-gray-400 break-all">TXID: {t.tx_hash}</p>
                     </div>
-                  ) : (
-                    <div className="pt-2 border-t border-gray-700 bg-gray-900/50 p-3 rounded-lg"><p className="text-xs font-bold text-gray-400 uppercase mb-1">Delivered</p><pre className="text-xs font-mono text-green-400 whitespace-pre-wrap">{order.delivery_info}</pre></div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded ${t.status === 'pending' ? 'bg-yellow-900/50 text-yellow-400' : t.status === 'confirmed' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
+                      {t.status.toUpperCase()}
+                    </span>
+                  </div>
+                  
+                  {t.status === 'pending' && (
+                    <div className="flex gap-2 pt-2 border-t border-gray-700">
+                      <button onClick={() => handleTopupAction(t.id, 'approve')} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">Approve</button>
+                      <button onClick={() => handleTopupAction(t.id, 'reject')} className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-red-700 transition-colors">Reject</button>
+                    </div>
                   )}
                 </div>
               ))
@@ -377,12 +435,69 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* SETTINGS TAB */}
+        {activeTab === 'users' && (
+          <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+            <div className="p-4 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+              <h2 className="font-bold text-white">User Management ({usersList.length})</h2>
+              <button onClick={fetchUsers} className="text-xs text-orange-400 font-semibold hover:text-orange-300">Refresh</button>
+            </div>
+            <div className="divide-y divide-gray-700 max-h-[600px] overflow-y-auto">
+              {usersList.map((u: any) => (
+                <div key={u.telegram_id} className={`p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 ${u.is_blocked ? 'bg-red-900/10 opacity-70' : ''}`}>
+                  
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 font-bold shrink-0">
+                      {u.first_name ? u.first_name[0].toUpperCase() : '?'}
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row md:items-center justify-between w-full gap-2">
+                      <div>
+                        <p className="font-semibold text-sm text-white">{u.first_name || 'Unknown'} {u.username && <span className="text-xs text-gray-400">@{u.username}</span>}</p>
+                        <p className="text-xs text-gray-400">
+                          ID: {u.telegram_id} • Source: <span className="text-orange-400">{u.source || 'organic'}</span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 bg-gray-900 p-1.5 rounded-lg border border-gray-700 w-fit">
+                        <span className="text-xs font-medium text-gray-400 pl-1">$</span>
+                        <input 
+                          type="number" 
+                          placeholder={(u.balance || 0).toFixed(2)}
+                          value={balanceInputs[u.telegram_id] !== undefined ? balanceInputs[u.telegram_id] : u.balance || 0}
+                          onChange={(e) => setBalanceInputs({...balanceInputs, [u.telegram_id]: e.target.value})}
+                          className="w-16 bg-transparent text-white text-sm font-bold focus:outline-none"
+                        />
+                        <button 
+                          onClick={() => handleUpdateBalance(u.telegram_id)}
+                          className="text-[10px] bg-orange-500 text-white font-bold px-2 py-1 rounded hover:bg-orange-600 transition-colors"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={() => handleToggleBan(u.telegram_id, u.is_blocked)} 
+                    className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition-colors shrink-0 ${
+                      u.is_blocked 
+                        ? 'bg-green-900/30 text-green-400 border border-green-700 hover:bg-green-900/50' 
+                        : 'bg-red-900/30 text-red-400 border border-red-700 hover:bg-red-900/50'
+                    }`}
+                  >
+                    {u.is_blocked ? <><UserCheck size={14} /> Unban</> : <><UserX size={14} /> Ban</>}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'settings' && (
           <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 space-y-5 max-w-2xl">
             <div>
               <h2 className="font-bold text-white text-lg mb-1">Support & Community Links</h2>
-              <p className="text-sm text-gray-400">These links are used across the Mini App (Checkout, Profile, Orders).</p>
+              <p className="text-sm text-gray-400">These links are used across the Mini App.</p>
             </div>
             
             <div>

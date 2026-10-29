@@ -19,18 +19,14 @@ export async function GET(req: Request) {
   const { count: userCount } = await supabaseAdmin.from('users').select('*', { count: 'exact', head: true })
   const { count: orderCount } = await supabaseAdmin.from('orders').select('*', { count: 'exact', head: true })
   
-  // NEW: Fetch traffic sources for the admin dashboard
-  const { data: sources } = await supabaseAdmin
-    .from('users')
-    .select('source')
-    .not('source', 'is', null)
+  const { data: sources } = await supabaseAdmin.from('users').select('source').not('source', 'is', null)
 
   return NextResponse.json({
     schemas: schemas || [],
     products: products || [],
     userCount: userCount || 0,
     orderCount: orderCount || 0,
-    sources: sources || [] // <-- ADDED THIS
+    sources: sources || []
   })
 }
 
@@ -44,10 +40,7 @@ export async function POST(req: Request) {
 
   if (action === 'add_category') {
     const { error } = await supabaseAdmin.from('category_schemas').insert({
-      category: data.category,
-      fields: data.fields,
-      default_view: data.default_view,
-      has_image: data.has_image || false
+      category: data.category, fields: data.fields, default_view: data.default_view, has_image: data.has_image || false
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })
@@ -60,6 +53,7 @@ export async function POST(req: Request) {
       price_usd: parseFloat(data.price_usd),
       image_url: data.image_url || null,
       metadata: data.metadata || {},
+      delivery_info: data.delivery_info || null, // <-- NEW
       is_sold: false
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -82,7 +76,8 @@ export async function PUT(req: Request) {
     category: data.category,
     price_usd: parseFloat(data.price_usd),
     image_url: data.image_url || null,
-    metadata: data.metadata || {}
+    metadata: data.metadata || {},
+    delivery_info: data.delivery_info || null // <-- NEW
   }).eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

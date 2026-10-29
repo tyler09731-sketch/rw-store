@@ -34,6 +34,7 @@ export default function ProductDetailSheet({
     tg.MainButton.show()
 
     const handleMainClick = () => {
+      if (!product) return  // GUARD: don't fire if product is null
       haptic.medium()
       onBuy(product)
       onClose()
@@ -44,7 +45,7 @@ export default function ProductDetailSheet({
       tg.MainButton.offClick(handleMainClick)
       tg.MainButton.hide()
     }
-  }, [product])
+  }, [product, onBuy, onClose])
 
   if (!product) return null
 

@@ -370,7 +370,12 @@ export default function Storefront() {
         )}
       </AnimatePresence>
 
-      <ProductDetailSheet product={detailProduct} onClose={() => setDetailProduct(null)} onBuy={(p) => { setSelectedProduct(p) }} />
+      <ProductDetailSheet 
+        product={detailProduct} 
+        onClose={() => setDetailProduct(null)} 
+        onBuy={(p) => { setSelectedProduct(p); setDetailProduct(null) }} 
+      />
+
       {selectedProduct && <CheckoutModal product={selectedProduct} onClose={() => setSelectedProduct(null)} userId={user?.id || 0} />}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} />
     </main>

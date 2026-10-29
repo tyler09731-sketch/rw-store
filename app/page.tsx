@@ -11,6 +11,8 @@ import BottomNav from '@/components/BottomNav'
 import OrdersPage from './orders/page'
 import WalletPage from './wallet/page'
 import ProfilePage from './profile/page'
+import ActivityTicker from '@/components/ActivityTicker'
+import ProductDetailSheet from '@/components/ProductDetailSheet'
 
 type Product = {
   id: number
@@ -32,6 +34,7 @@ export default function Storefront() {
   
   const [activeCategory, setActiveCategory] = useState('All')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('items')
   const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string, balance?: number } | null>(null)
   const [orderCount, setOrderCount] = useState(0)
@@ -165,6 +168,8 @@ export default function Storefront() {
         )}
       </div>
 
+      <ActivityTicker />
+
       {loading ? (
         <div className="flex justify-center py-20"><RotateCw className="animate-spin text-orange-500" /></div>
       ) : filteredProducts.length === 0 ? (
@@ -204,7 +209,7 @@ export default function Storefront() {
                     ))}
                     <td className="p-3 text-sm font-bold whitespace-nowrap text-orange-600">{formatPrice(p.price_usd)}</td>
                     <td className="p-3 text-right sticky right-0 z-10 bg-white shadow-[-8px_0_10px_rgba(0,0,0,0.05)]">
-                      <button onClick={() => { haptic.medium(); setSelectedProduct(p); }} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-transform">Buy</button>
+                      <button onClick={() => { haptic.medium(); setDetailProduct(p); }} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-transform">View</button>
                     </td>
                   </motion.tr>
                 ))}
@@ -239,7 +244,7 @@ export default function Storefront() {
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
                   <div><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p><p className="text-2xl font-extrabold text-gray-900">{formatPrice(product.price_usd)}</p></div>
-                  <button onClick={() => { haptic.medium(); setSelectedProduct(product); }} className="bg-orange-500 text-white px-7 py-3 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2"><Package size={16} /> Buy Now</button>
+                  <button onClick={() => { haptic.medium(); setDetailProduct(product); }} className="bg-orange-500 text-white px-7 py-3 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2"><Package size={16} /> View</button>
                 </div>
               </motion.div>
             ))}
@@ -265,6 +270,12 @@ export default function Storefront() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ProductDetailSheet 
+        product={detailProduct} 
+        onClose={() => setDetailProduct(null)} 
+        onBuy={(p) => { setSelectedProduct(p) }} 
+      />
 
       {selectedProduct && <CheckoutModal product={selectedProduct} onClose={() => setSelectedProduct(null)} userId={user?.id || 0} />}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />

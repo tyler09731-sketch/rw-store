@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3, UserX, UserCheck } from 'lucide-react'
+import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3, UserX, UserCheck, Wallet, Bitcoin } from 'lucide-react'
 import { Country, State } from 'country-state-city'
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/dropzone'
 import { useSupabaseUpload } from '@/hooks/use-supabase-upload'
@@ -18,9 +18,10 @@ export default function AdminPage() {
   const [usersList, setUsersList] = useState<any[]>([])
   const [topups, setTopups] = useState<any[]>([])
   const [settings, setSettings] = useState<any>(null)
+  const [cryptoMethods, setCryptoMethods] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'settings'>('inventory')
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'crypto' | 'settings'>('inventory')
   
   const [balanceInputs, setBalanceInputs] = useState<Record<number, string>>({})
   const [savedUserId, setSavedUserId] = useState<number | null>(null)
@@ -46,6 +47,16 @@ export default function AdminPage() {
   const [proofsUrl, setProofsUrl] = useState('')
   const [guidesUrl, setGuidesUrl] = useState('')
 
+  // Crypto Form State
+  const [showCryptoForm, setShowCryptoForm] = useState(false)
+  const [cryptoEditId, setCryptoEditId] = useState<number | null>(null)
+  const [cryptoName, setCryptoName] = useState('')
+  const [cryptoSymbol, setCryptoSymbol] = useState('')
+  const [cryptoNetwork, setCryptoNetwork] = useState('')
+  const [cryptoWallet, setCryptoWallet] = useState('')
+  const [cryptoRecommended, setCryptoRecommended] = useState(false)
+  const [cryptoEmoji, setCryptoEmoji] = useState('₮')
+
   const countries = Country.getAllCountries()
   const availableStates = selectedCountryCode ? State.getStatesOfCountry(selectedCountryCode) : []
   const hasStates = availableStates.length > 0
@@ -68,7 +79,7 @@ export default function AdminPage() {
     }
   }, [uploadProps.isSuccess, uploadProps.successes])
 
-  // AUTO-LOGIN: try saved password on mount
+  // AUTO-LOGIN
   useEffect(() => {
     const saved = localStorage.getItem('rw_admin_pw')
     if (saved) {
@@ -76,11 +87,11 @@ export default function AdminPage() {
       fetch(`/api/admin/products?password=${saved}`).then(r => {
         if (r.ok) {
           r.json().then(d => {
-            setData(d)
-            setIsAuthenticated(true)
+            setData(d); setIsAuthenticated(true)
             fetch(`/api/admin/orders?password=${saved}`).then(or => or.json()).then(od => setOrders(od.orders || []))
             fetch(`/api/admin/users?password=${saved}`).then(ur => ur.json()).then(ud => setUsersList(ud.users || []))
             fetch(`/api/topups?password=${saved}`).then(tr => tr.json()).then(td => setTopups(td.topups || []))
+            fetch('/api/admin/crypto').then(cr => cr.json()).then(cd => setCryptoMethods(cd.methods || []))
             fetch('/api/admin/settings').then(sr => sr.json()).then(sd => {
               setSettings(sd); setSupportUrl(sd.support_url || ''); setProofsUrl(sd.proofs_url || ''); setGuidesUrl(sd.guides_url || '')
             })
@@ -113,6 +124,11 @@ export default function AdminPage() {
     if (res.ok) { const d = await res.json(); setTopups(d.topups || []) }
   }
 
+  const fetchCrypto = async () => {
+    const res = await fetch('/api/admin/crypto')
+    if (res.ok) { const d = await res.json(); setCryptoMethods(d.methods || []) }
+  }
+
   const fetchSettings = async () => {
     const res = await fetch('/api/admin/settings')
     if (res.ok) {
@@ -127,7 +143,7 @@ export default function AdminPage() {
     const ok = await fetchData()
     if (ok) {
       localStorage.setItem('rw_admin_pw', password)
-      await fetchOrders(); await fetchUsers(); await fetchTopups(); await fetchSettings()
+      await fetchOrders(); await fetchUsers(); await fetchTopups(); await fetchCrypto(); await fetchSettings()
     }
     setLoading(false)
   }
@@ -208,6 +224,33 @@ export default function AdminPage() {
     fetchTopups(); fetchData()
   }
 
+  // --- CRYPTO HANDLERS ---
+  const resetCryptoForm = () => {
+    setCryptoEditId(null); setCryptoName(''); setCryptoSymbol(''); setCryptoNetwork(''); setCryptoWallet(''); setCryptoRecommended(false); setCryptoEmoji('₮'); setShowCryptoForm(false)
+  }
+
+  const handleEditCrypto = (m: any) => {
+    setCryptoEditId(m.id); setCryptoName(m.name); setCryptoSymbol(m.symbol); setCryptoNetwork(m.network || ''); setCryptoWallet(m.wallet_address); setCryptoRecommended(m.is_recommended); setCryptoEmoji(m.icon_emoji || '₮'); setShowCryptoForm(true); window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleSaveCrypto = async () => {
+    if (!cryptoName || !cryptoWallet) { alert('Name and Wallet Address are required'); return }
+    const payload = { password, name: cryptoName, symbol: cryptoSymbol || cryptoName.toUpperCase(), network: cryptoNetwork, wallet_address: cryptoWallet, is_recommended: cryptoRecommended, icon_emoji: cryptoEmoji }
+    if (cryptoEditId) {
+      await fetch('/api/admin/crypto', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: cryptoEditId }) })
+    } else {
+      await fetch('/api/admin/crypto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    }
+    resetCryptoForm(); fetchCrypto()
+  }
+
+  const handleDeleteCrypto = async (id: number) => {
+    if (confirm('Delete this crypto method?')) {
+      await fetch(`/api/admin/crypto?password=${password}&id=${id}`, { method: 'DELETE' })
+      fetchCrypto()
+    }
+  }
+
   const selectedSchema = data?.schemas.find((s: any) => s.category === prodCategory)
 
   if (!isAuthenticated) {
@@ -234,7 +277,6 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans pb-20">
       <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-4">
         
-        {/* Header */}
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2">
             <ShieldAlert className="text-orange-500" size={24} />
@@ -243,37 +285,27 @@ export default function AdminPage() {
           <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-400 font-semibold px-3 py-1.5 rounded-lg border border-gray-700">Lock</button>
         </div>
 
-        {/* Stats Row */}
         <div className="grid grid-cols-3 gap-2 md:gap-4">
           <div className="bg-gray-800 p-3 md:p-5 rounded-xl border border-gray-700 flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-4">
             <div className="p-2 bg-blue-900/30 rounded-lg shrink-0"><Users className="text-blue-400" size={18} /></div>
-            <div className="min-w-0">
-              <p className="text-[10px] md:text-xs text-gray-400 truncate">Users</p>
-              <p className="text-lg md:text-2xl font-bold text-white truncate">{data.userCount}</p>
-            </div>
+            <div className="min-w-0"><p className="text-[10px] md:text-xs text-gray-400 truncate">Users</p><p className="text-lg md:text-2xl font-bold text-white truncate">{data.userCount}</p></div>
           </div>
           <div className="bg-gray-800 p-3 md:p-5 rounded-xl border border-gray-700 flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-4">
             <div className="p-2 bg-green-900/30 rounded-lg shrink-0"><ShoppingBag className="text-green-400" size={18} /></div>
-            <div className="min-w-0">
-              <p className="text-[10px] md:text-xs text-gray-400 truncate">Orders</p>
-              <p className="text-lg md:text-2xl font-bold text-white truncate">{data.orderCount}</p>
-            </div>
+            <div className="min-w-0"><p className="text-[10px] md:text-xs text-gray-400 truncate">Orders</p><p className="text-lg md:text-2xl font-bold text-white truncate">{data.orderCount}</p></div>
           </div>
           <div className="bg-gray-800 p-3 md:p-5 rounded-xl border border-gray-700 flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-4">
             <div className="p-2 bg-orange-900/30 rounded-lg shrink-0"><BarChart3 className="text-orange-400" size={18} /></div>
-            <div className="min-w-0">
-              <p className="text-[10px] md:text-xs text-gray-400 truncate">Products</p>
-              <p className="text-lg md:text-2xl font-bold text-white truncate">{data.products.length}</p>
-            </div>
+            <div className="min-w-0"><p className="text-[10px] md:text-xs text-gray-400 truncate">Products</p><p className="text-lg md:text-2xl font-bold text-white truncate">{data.products.length}</p></div>
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex bg-gray-800 p-1 rounded-xl border border-gray-700 overflow-x-auto scrollbar-hide">
           <button onClick={() => setActiveTab('inventory')} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'inventory' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Inventory</button>
           <button onClick={() => { setActiveTab('orders'); fetchOrders() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Orders ({orders.filter(o => o.status === 'pending').length})</button>
           <button onClick={() => { setActiveTab('topups'); fetchTopups() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'topups' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Top-Ups ({topups.filter(t => t.status === 'pending').length})</button>
           <button onClick={() => { setActiveTab('users'); fetchUsers() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'users' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Users</button>
+          <button onClick={() => { setActiveTab('crypto'); fetchCrypto() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'crypto' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Crypto</button>
           <button onClick={() => { setActiveTab('settings'); fetchSettings() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'settings' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Settings</button>
         </div>
 
@@ -355,10 +387,7 @@ export default function AdminPage() {
               <div className="divide-y divide-gray-700 max-h-[500px] overflow-y-auto">
                 {data.products.map((p: any) => (
                   <div key={p.id} className={`p-3 flex items-center justify-between gap-2 ${p.is_sold ? 'bg-gray-900/50 opacity-60' : ''}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-xs text-white truncate">{p.title}</p>
-                      <p className="text-[10px] text-gray-400 truncate">{p.category} • ${p.price_usd}</p>
-                    </div>
+                    <div className="min-w-0 flex-1"><p className="font-semibold text-xs text-white truncate">{p.title}</p><p className="text-[10px] text-gray-400 truncate">{p.category} • ${p.price_usd}</p></div>
                     <div className="flex gap-1 shrink-0">
                       <button onClick={() => handleToggleSold(p.id, p.is_sold)} className={`p-1.5 rounded transition-colors ${p.is_sold ? 'text-orange-400 bg-orange-900/30' : 'text-gray-400 bg-gray-700'}`}><CheckCircle size={14} /></button>
                       <button onClick={() => handleEditClick(p)} className="text-blue-400 p-1.5 bg-blue-900/30 rounded"><Pencil size={14} /></button>
@@ -380,10 +409,8 @@ export default function AdminPage() {
                 const productInfo = order.products?.delivery_info || ''
                 const metadata = order.products?.metadata || {}
                 const metaEntries = Object.entries(metadata).filter(([k, v]) => v && v !== '-' && v !== 'N/A')
-                
                 return (
                   <div key={order.id} className={`bg-gray-800 rounded-2xl border p-4 space-y-3 ${order.status === 'pending' ? 'border-yellow-700/50 bg-yellow-900/10' : 'border-green-700/50 bg-green-900/10'}`}>
-                    
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <h3 className="font-bold text-white text-sm truncate">{order.products?.title || 'Unknown'}</h3>
@@ -396,52 +423,29 @@ export default function AdminPage() {
                         <span className="flex items-center gap-1 bg-green-900/50 text-green-400 text-[10px] font-bold px-2 py-1 rounded border border-green-700 shrink-0"><CheckCircle size={10} /> Delivered</span>
                       )}
                     </div>
-
                     {metaEntries.length > 0 && (
                       <div className="bg-gray-900/50 rounded-lg p-2.5 border border-gray-700">
                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5">Product Info</p>
                         <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                           {metaEntries.map(([key, value]: [string, any]) => (
-                            <div key={key} className="flex justify-between text-[11px]">
-                              <span className="text-gray-500">{key}:</span>
-                              <span className="text-white font-medium truncate ml-1">{String(value)}</span>
-                            </div>
+                            <div key={key} className="flex justify-between text-[11px]"><span className="text-gray-500">{key}:</span><span className="text-white font-medium truncate ml-1">{String(value)}</span></div>
                           ))}
                         </div>
                       </div>
                     )}
-
                     <div className="flex flex-wrap gap-2 text-xs text-gray-300">
                       <span>Price: <strong className="text-white">${order.price_usd || order.products?.price_usd || '0'}</strong></span>
                       <span>Coin: <strong className="text-white">{order.crypto_coin}</strong></span>
                       <span>Cat: <strong className="text-blue-400">{order.products?.category || 'N/A'}</strong></span>
                     </div>
-
                     {order.status === 'pending' ? (
                       <div className="pt-2 border-t border-gray-700 space-y-2">
                         <p className="text-[10px] font-bold text-gray-400 uppercase">Delivery Info {productInfo && <span className="text-green-400">(Auto-filled)</span>}</p>
-                        <textarea 
-                          id={`delivery-${order.id}`} 
-                          defaultValue={productInfo} 
-                          placeholder="LOGIN: ... PASS: ... AN: ... RN: ..." 
-                          className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                          rows={4} 
-                        />
-                        <button 
-                          onClick={() => { 
-                            const el = document.getElementById(`delivery-${order.id}`) as HTMLTextAreaElement
-                            handleConfirmOrder(order.id, el.value) 
-                          }} 
-                          className="w-full bg-green-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
-                        >
-                          Confirm & Deliver
-                        </button>
+                        <textarea id={`delivery-${order.id}`} defaultValue={productInfo} placeholder="LOGIN: ... PASS: ... AN: ... RN: ..." className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" rows={4} />
+                        <button onClick={() => { const el = document.getElementById(`delivery-${order.id}`) as HTMLTextAreaElement; handleConfirmOrder(order.id, el.value) }} className="w-full bg-green-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">Confirm & Deliver</button>
                       </div>
                     ) : (
-                      <div className="pt-2 border-t border-gray-700 bg-gray-900/50 p-2.5 rounded-lg">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Delivered</p>
-                        <pre className="text-[11px] font-mono text-green-400 whitespace-pre-wrap">{order.delivery_info}</pre>
-                      </div>
+                      <div className="pt-2 border-t border-gray-700 bg-gray-900/50 p-2.5 rounded-lg"><p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Delivered</p><pre className="text-[11px] font-mono text-green-400 whitespace-pre-wrap">{order.delivery_info}</pre></div>
                     )}
                   </div>
                 )
@@ -465,7 +469,6 @@ export default function AdminPage() {
                     </div>
                     <span className={`text-[10px] font-bold px-2 py-1 rounded shrink-0 ${t.status === 'pending' ? 'bg-yellow-900/50 text-yellow-400' : t.status === 'confirmed' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>{t.status.toUpperCase()}</span>
                   </div>
-                  
                   {t.status === 'pending' && (
                     <div className="flex gap-2 pt-2 border-t border-gray-700">
                       <button onClick={() => handleTopupAction(t.id, 'approve')} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">Approve</button>
@@ -488,9 +491,7 @@ export default function AdminPage() {
               {usersList.map((u: any) => (
                 <div key={u.telegram_id} className={`p-3 flex flex-col gap-2 ${u.is_blocked ? 'bg-red-900/10 opacity-70' : ''}`}>
                   <div className="flex items-center gap-2 w-full">
-                    <div className="w-9 h-9 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 font-bold shrink-0 text-sm">
-                      {u.first_name ? u.first_name[0].toUpperCase() : '?'}
-                    </div>
+                    <div className="w-9 h-9 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 font-bold shrink-0 text-sm">{u.first_name ? u.first_name[0].toUpperCase() : '?'}</div>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-xs text-white truncate">{u.first_name || 'Unknown'} {u.username && <span className="text-gray-400">@{u.username}</span>}</p>
                       <p className="text-[10px] text-gray-400 truncate">ID: {u.telegram_id} • <span className="text-orange-400">{u.source || 'organic'}</span></p>
@@ -501,19 +502,8 @@ export default function AdminPage() {
                   </div>
                   <div className="flex items-center gap-2 bg-gray-900 p-1 rounded-lg border border-gray-700 w-full">
                     <span className="text-xs font-medium text-gray-400 pl-1">$</span>
-                    <input 
-                      type="number" 
-                      placeholder={(u.balance || 0).toFixed(2)}
-                      value={balanceInputs[u.telegram_id] !== undefined ? balanceInputs[u.telegram_id] : u.balance || 0}
-                      onChange={(e) => setBalanceInputs({...balanceInputs, [u.telegram_id]: e.target.value})}
-                      className="flex-1 min-w-0 bg-transparent text-white text-sm font-bold focus:outline-none"
-                    />
-                    <button 
-                      onClick={() => handleUpdateBalance(u.telegram_id)}
-                      className={`text-[10px] font-bold px-2.5 py-1.5 rounded transition-colors ${savedUserId === u.telegram_id ? 'bg-green-500 text-white' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                    >
-                      {savedUserId === u.telegram_id ? '✓' : 'Save'}
-                    </button>
+                    <input type="number" placeholder={(u.balance || 0).toFixed(2)} value={balanceInputs[u.telegram_id] !== undefined ? balanceInputs[u.telegram_id] : u.balance || 0} onChange={(e) => setBalanceInputs({...balanceInputs, [u.telegram_id]: e.target.value})} className="flex-1 min-w-0 bg-transparent text-white text-sm font-bold focus:outline-none" />
+                    <button onClick={() => handleUpdateBalance(u.telegram_id)} className={`text-[10px] font-bold px-2.5 py-1.5 rounded transition-colors ${savedUserId === u.telegram_id ? 'bg-green-500 text-white' : 'bg-orange-500 text-white hover:bg-orange-600'}`}>{savedUserId === u.telegram_id ? '✓' : 'Save'}</button>
                   </div>
                 </div>
               ))}
@@ -521,24 +511,65 @@ export default function AdminPage() {
           </div>
         )}
 
+        {activeTab === 'crypto' && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <button onClick={() => { resetCryptoForm(); setShowCryptoForm(!showCryptoForm); }} className="flex-1 flex items-center justify-center gap-2 text-xs md:text-sm font-semibold bg-orange-500 text-white px-3 py-2.5 rounded-lg hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><Bitcoin size={14} /> Add Crypto</button>
+            </div>
+
+            {showCryptoForm && (
+              <div className={`bg-gray-800 p-4 rounded-2xl border-2 ${cryptoEditId ? 'border-orange-500' : 'border-gray-700'} space-y-3`}>
+                <div className="flex justify-between items-center">
+                  <h2 className="font-bold text-white">{cryptoEditId ? 'Edit Crypto' : 'New Crypto Method'}</h2>
+                  {cryptoEditId && <button onClick={resetCryptoForm} className="text-xs text-red-400 font-semibold">Cancel</button>}
+                </div>
+                <input placeholder="Name (e.g. USDT)" value={cryptoName} onChange={e => setCryptoName(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <input placeholder="Symbol (e.g. USDT)" value={cryptoSymbol} onChange={e => setCryptoSymbol(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <input placeholder="Network (e.g. TRC20)" value={cryptoNetwork} onChange={e => setCryptoNetwork(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <input placeholder="Wallet Address" value={cryptoWallet} onChange={e => setCryptoWallet(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <input placeholder="Emoji Icon (e.g. ₮ or ₿)" value={cryptoEmoji} onChange={e => setCryptoEmoji(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <label className="flex items-center gap-2 p-2.5 bg-gray-700 rounded-lg cursor-pointer border border-gray-600">
+                  <input type="checkbox" checked={cryptoRecommended} onChange={e => setCryptoRecommended(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+                  <span className="text-xs font-medium text-gray-200">Set as Recommended (Fastest / Lowest Fee)</span>
+                </label>
+                <button onClick={handleSaveCrypto} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">{cryptoEditId ? 'Update Crypto' : 'Save Crypto'}</button>
+              </div>
+            )}
+
+            <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+              <div className="p-3 border-b border-gray-700 bg-gray-800/50"><h2 className="font-bold text-white text-sm">Active Crypto Methods ({cryptoMethods.length})</h2></div>
+              <div className="divide-y divide-gray-700">
+                {cryptoMethods.length === 0 ? (
+                  <div className="p-6 text-center text-gray-400 text-sm">No crypto methods yet. Add one above.</div>
+                ) : (
+                  cryptoMethods.map((m: any) => (
+                    <div key={m.id} className="p-3 flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{m.icon_emoji}</span>
+                          <p className="font-semibold text-xs text-white truncate">{m.name} {m.network && <span className="text-gray-400">({m.network})</span>}</p>
+                          {m.is_recommended && <span className="text-[9px] font-bold bg-orange-900/50 text-orange-400 px-1.5 py-0.5 rounded border border-orange-700">REC</span>}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-mono truncate">{m.wallet_address}</p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button onClick={() => handleEditCrypto(m)} className="text-blue-400 p-1.5 bg-blue-900/30 rounded"><Pencil size={14} /></button>
+                        <button onClick={() => handleDeleteCrypto(m.id)} className="text-red-400 p-1.5 bg-red-900/30 rounded"><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'settings' && (
           <div className="bg-gray-800 p-4 rounded-2xl border border-gray-700 space-y-4">
-            <div>
-              <h2 className="font-bold text-white text-base mb-1">Support Links</h2>
-              <p className="text-xs text-gray-400">Used across the Mini App.</p>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Support URL</label>
-              <input type="url" value={supportUrl} onChange={e => setSupportUrl(e.target.value)} placeholder="https://t.me/your_support" className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Proofs URL</label>
-              <input type="url" value={proofsUrl} onChange={e => setProofsUrl(e.target.value)} placeholder="https://t.me/your_proofs" className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Guides URL</label>
-              <input type="url" value={guidesUrl} onChange={e => setGuidesUrl(e.target.value)} placeholder="https://t.me/your_guides" className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-            </div>
+            <div><h2 className="font-bold text-white text-base mb-1">Support Links</h2><p className="text-xs text-gray-400">Used across the Mini App.</p></div>
+            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Support URL</label><input type="url" value={supportUrl} onChange={e => setSupportUrl(e.target.value)} placeholder="https://t.me/your_support" className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" /></div>
+            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Proofs URL</label><input type="url" value={proofsUrl} onChange={e => setProofsUrl(e.target.value)} placeholder="https://t.me/your_proofs" className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" /></div>
+            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Guides URL</label><input type="url" value={guidesUrl} onChange={e => setGuidesUrl(e.target.value)} placeholder="https://t.me/your_guides" className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" /></div>
             <button onClick={handleSaveSettings} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors">Save Settings</button>
           </div>
         )}

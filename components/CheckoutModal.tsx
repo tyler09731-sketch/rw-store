@@ -5,27 +5,18 @@ import { X, Copy, CheckCircle2, ShieldCheck, ChevronLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { haptic } from '@/lib/haptics'
 import { supabase } from '@/lib/supabase'
+import CryptoSelector from './CryptoSelector'
 
-type Product = {
-  id: number
-  title: string
-  price_usd: number
-}
+type Product = { id: number; title: string; price_usd: number }
 
 export default function CheckoutModal({ product, onClose, userId }: { product: Product, onClose: () => void, userId: number }) {
   const [step, setStep] = useState<'select' | 'pay' | 'hash' | 'success'>('select')
-  const [selectedCoin, setSelectedCoin] = useState<'BTC' | 'USDT_TRC20' | 'USDT_BEP20'>('USDT_TRC20')
+  const [selectedMethod, setSelectedMethod] = useState<any>(null)
   const [copied, setCopied] = useState(false)
   const [timeLeft, setTimeLeft] = useState(900)
   const [txHash, setTxHash] = useState('')
   const [loading, setLoading] = useState(false)
   const [orderRef, setOrderRef] = useState('')
-
-  const walletAddresses = {
-    BTC: process.env.NEXT_PUBLIC_WALLET_BTC || 'bc1q...',
-    USDT_TRC20: process.env.NEXT_PUBLIC_WALLET_USDT_TRC20 || 'T...',
-    USDT_BEP20: process.env.NEXT_PUBLIC_WALLET_USDT_BEP20 || '0x...',
-  }
 
   useEffect(() => {
     if (step !== 'pay') return
@@ -43,9 +34,7 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
         if (step === 'pay') setStep('select')
         if (step === 'hash') setStep('pay')
       })
-    } else {
-      tg.BackButton.hide()
-    }
+    } else { tg.BackButton.hide() }
     return () => { tg.BackButton.offClick() }
   }, [step])
 
@@ -56,7 +45,7 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
   }
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(walletAddresses[selectedCoin])
+    navigator.clipboard.writeText(selectedMethod.wallet_address)
     haptic.success()
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -69,35 +58,19 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
     onClose()
   }
 
-  const handleBack = () => {
-    haptic.light()
-    if (step === 'pay') setStep('select')
-    if (step === 'hash') setStep('pay')
-  }
-
   const handleSubmit = async () => {
-    if (!txHash.trim()) return
+    if (!txHash.trim() || !selectedMethod) return
     setLoading(true)
     haptic.success()
-
     const ref = `RW-${Date.now().toString().slice(-6)}`
     setOrderRef(ref)
-
     const { error } = await supabase.from('orders').insert({
-      order_ref: ref,
-      user_id: userId,
-      product_id: product.id,
-      price_usd: product.price_usd,
-      crypto_coin: selectedCoin,
-      tx_hash: txHash,
-      status: 'pending'
+      order_ref: ref, user_id: userId, product_id: product.id, price_usd: product.price_usd,
+      crypto_coin: `${selectedMethod.name} ${selectedMethod.network || ''}`.trim(),
+      tx_hash: txHash, status: 'pending'
     })
-
     setLoading(false)
-    if (error) {
-      alert('Error submitting order: ' + error.message)
-      return
-    }
+    if (error) { alert('Error: ' + error.message); return }
     setStep('success')
   }
 
@@ -108,7 +81,7 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               {step !== 'select' && step !== 'success' && (
-                <button onClick={handleBack} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full"><ChevronLeft size={20} /></button>
+                <button onClick={() => { haptic.light(); if (step === 'pay') setStep('select'); if (step === 'hash') setStep('pay') }} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full"><ChevronLeft size={20} /></button>
               )}
               <h2 className="text-xl font-bold">{step === 'success' ? 'Order Submitted' : step === 'select' ? 'Select Payment' : step === 'pay' ? 'Complete Payment' : 'Confirm Payment'}</h2>
             </div>
@@ -126,28 +99,19 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
           )}
 
           {step === 'select' && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-500 mb-4">Choose your preferred network.</p>
-              <button onClick={() => { haptic.light(); setSelectedCoin('USDT_TRC20'); setStep('pay'); }} className="w-full flex items-center justify-between p-4 border-2 border-orange-500 bg-orange-50 rounded-xl relative overflow-hidden">
-                <div className="flex items-center gap-3"><div className="w-10 h-10 bg-[#26A17B] rounded-full flex items-center justify-center text-white font-bold">₮</div><div className="text-left"><p className="font-bold">USDT (TRC20)</p><p className="text-xs text-gray-500">Fastest • Lowest Fee</p></div></div>
-                <span className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</span>
-              </button>
-              <button onClick={() => { haptic.light(); setSelectedCoin('BTC'); setStep('pay'); }} className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl active:bg-gray-50">
-                <div className="w-10 h-10 bg-[#F7931A] rounded-full flex items-center justify-center text-white font-bold">₿</div><div className="text-left"><p className="font-bold">Bitcoin (BTC)</p><p className="text-xs text-gray-500">Network Fee: ~$2.50</p></div>
-              </button>
-              <button onClick={() => { haptic.light(); setSelectedCoin('USDT_BEP20'); setStep('pay'); }} className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl active:bg-gray-50">
-                <div className="w-10 h-10 bg-[#F3BA2F] rounded-full flex items-center justify-center text-white font-bold">₮</div><div className="text-left"><p className="font-bold">USDT (BEP20)</p><p className="text-xs text-gray-500">BSC Network</p></div>
-              </button>
-            </div>
+            <CryptoSelector 
+              selectedId={selectedMethod?.id || null}
+              onSelect={(m) => { setSelectedMethod(m); setStep('pay') }} 
+            />
           )}
 
-          {step === 'pay' && (
+          {step === 'pay' && selectedMethod && (
             <div className="space-y-4">
               <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex items-center justify-between border border-orange-100"><span className="text-sm font-medium">Rate locked for</span><span className="font-bold font-mono text-lg">{formatTime(timeLeft)}</span></div>
-              <div className="text-center py-4"><p className="text-sm text-gray-500 mb-1">Send exactly</p><p className="text-2xl font-bold text-gray-900">${Math.floor(product.price_usd)} USD</p><p className="text-sm font-medium text-orange-500 mt-1">in {selectedCoin.replace('_', ' ')}</p></div>
+              <div className="text-center py-4"><p className="text-sm text-gray-500 mb-1">Send exactly</p><p className="text-2xl font-bold text-gray-900">${Math.floor(product.price_usd)} USD</p><p className="text-sm font-medium text-orange-500 mt-1">in {selectedMethod.name} {selectedMethod.network}</p></div>
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                 <p className="text-xs font-bold text-gray-400 uppercase mb-2">Wallet Address</p>
-                <p className="font-mono text-sm break-all text-gray-800">{walletAddresses[selectedCoin]}</p>
+                <p className="font-mono text-sm break-all text-gray-800">{selectedMethod.wallet_address}</p>
                 <button onClick={handleCopy} className="mt-3 w-full flex items-center justify-center gap-2 bg-white border border-gray-200 py-2.5 rounded-lg font-semibold text-sm active:scale-95 transition-transform">{copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}{copied ? 'Copied!' : 'Copy Address'}</button>
               </div>
               <button onClick={() => { haptic.success(); setStep('hash'); }} className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 active:scale-95 transition-transform">I have sent the payment</button>

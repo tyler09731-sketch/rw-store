@@ -85,12 +85,6 @@ export default function Storefront() {
       if (prods) {
         setProducts(prods)
         setShuffledAllProducts(shuffleArray(prods))
-        
-        toast.success(`${prods.length} products loaded`, {
-          description: 'Browse the latest inventory',
-          duration: 3000,
-          id: 'product-count',
-        })
       }
 
       if (user?.id) {

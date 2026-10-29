@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
   const { data: orders, error } = await supabaseAdmin
     .from('orders')
-    .select('*, products(title, category, delivery_info), users(telegram_id, first_name)')
+    .select('*, products(title, category, delivery_info), users(telegram_id, first_name, username)')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -38,7 +38,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Missing order ID or delivery info' }, { status: 400 })
   }
 
-  // 1. Update the order
   const { data: order, error } = await supabaseAdmin
     .from('orders')
     .update({ status: 'confirmed', delivery_info })
@@ -48,7 +47,6 @@ export async function PATCH(req: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // 2. Send notification to the buyer
   try {
     if (order && order.users?.telegram_id) {
       await bot.telegram.sendMessage(
@@ -57,16 +55,13 @@ export async function PATCH(req: Request) {
         {
           parse_mode: 'Markdown',
           reply_markup: {
-            inline_keyboard: [[
-              { text: '📦 View Order', web_app: { url: 'https://rw-store-gray.vercel.app/' } }
-            ]]
+            inline_keyboard: [[{ text: '📦 View Order', web_app: { url: 'https://rw-store-gray.vercel.app/' } }]]
           }
         }
       )
     }
   } catch (e) {
     console.error('Notification error:', e)
-    // Don't fail the request if the message fails (e.g., user blocked bot)
   }
 
   return NextResponse.json({ success: true })

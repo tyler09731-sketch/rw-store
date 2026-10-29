@@ -29,9 +29,7 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
 
   useEffect(() => {
     if (step !== 'pay') return
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0))
-    }, 1000)
+    const timer = setInterval(() => { setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0)) }, 1000)
     return () => clearInterval(timer)
   }, [step])
 
@@ -77,7 +75,6 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
     if (step === 'hash') setStep('pay')
   }
 
-  // FIXED: This actually creates the order
   const handleSubmit = async () => {
     if (!txHash.trim()) return
     setLoading(true)
@@ -90,6 +87,7 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
       order_ref: ref,
       user_id: userId,
       product_id: product.id,
+      price_usd: product.price_usd,
       crypto_coin: selectedCoin,
       tx_hash: txHash,
       status: 'pending'
@@ -105,38 +103,21 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
 
   return (
     <AnimatePresence>
-      <motion.div 
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={handleClose}
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
-      >
-        <motion.div 
-          initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-          transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          onClick={(e) => e.stopPropagation()}
-          className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10"
-        >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleClose} className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm">
+        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               {step !== 'select' && step !== 'success' && (
-                <button onClick={handleBack} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full">
-                  <ChevronLeft size={20} />
-                </button>
+                <button onClick={handleBack} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full"><ChevronLeft size={20} /></button>
               )}
-              <h2 className="text-xl font-bold">
-                {step === 'success' ? 'Order Submitted' : step === 'select' ? 'Select Payment' : step === 'pay' ? 'Complete Payment' : 'Confirm Payment'}
-              </h2>
+              <h2 className="text-xl font-bold">{step === 'success' ? 'Order Submitted' : step === 'select' ? 'Select Payment' : step === 'pay' ? 'Complete Payment' : 'Confirm Payment'}</h2>
             </div>
-            <button onClick={handleClose} className="p-2 bg-gray-100 rounded-full text-gray-500">
-              <X size={20} />
-            </button>
+            <button onClick={handleClose} className="p-2 bg-gray-100 rounded-full text-gray-500"><X size={20} /></button>
           </div>
 
           {step === 'success' && (
             <div className="text-center py-8">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 size={40} className="text-green-500" />
-              </div>
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle2 size={40} className="text-green-500" /></div>
               <h3 className="font-bold text-lg mb-2">Order Submitted!</h3>
               <p className="text-sm text-gray-500 mb-4">Your order <strong>#{orderRef}</strong> is pending verification.</p>
               <p className="text-xs text-gray-400 mb-6">We'll notify you in this chat as soon as it's delivered.</p>
@@ -148,41 +129,26 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
             <div className="space-y-3">
               <p className="text-sm text-gray-500 mb-4">Choose your preferred network.</p>
               <button onClick={() => { haptic.light(); setSelectedCoin('USDT_TRC20'); setStep('pay'); }} className="w-full flex items-center justify-between p-4 border-2 border-orange-500 bg-orange-50 rounded-xl relative overflow-hidden">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#26A17B] rounded-full flex items-center justify-center text-white font-bold">₮</div>
-                  <div className="text-left"><p className="font-bold">USDT (TRC20)</p><p className="text-xs text-gray-500">Fastest • Lowest Fee</p></div>
-                </div>
+                <div className="flex items-center gap-3"><div className="w-10 h-10 bg-[#26A17B] rounded-full flex items-center justify-center text-white font-bold">₮</div><div className="text-left"><p className="font-bold">USDT (TRC20)</p><p className="text-xs text-gray-500">Fastest • Lowest Fee</p></div></div>
                 <span className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</span>
               </button>
               <button onClick={() => { haptic.light(); setSelectedCoin('BTC'); setStep('pay'); }} className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl active:bg-gray-50">
-                <div className="w-10 h-10 bg-[#F7931A] rounded-full flex items-center justify-center text-white font-bold">₿</div>
-                <div className="text-left"><p className="font-bold">Bitcoin (BTC)</p><p className="text-xs text-gray-500">Network Fee: ~$2.50</p></div>
+                <div className="w-10 h-10 bg-[#F7931A] rounded-full flex items-center justify-center text-white font-bold">₿</div><div className="text-left"><p className="font-bold">Bitcoin (BTC)</p><p className="text-xs text-gray-500">Network Fee: ~$2.50</p></div>
               </button>
               <button onClick={() => { haptic.light(); setSelectedCoin('USDT_BEP20'); setStep('pay'); }} className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl active:bg-gray-50">
-                <div className="w-10 h-10 bg-[#F3BA2F] rounded-full flex items-center justify-center text-white font-bold">₮</div>
-                <div className="text-left"><p className="font-bold">USDT (BEP20)</p><p className="text-xs text-gray-500">BSC Network</p></div>
+                <div className="w-10 h-10 bg-[#F3BA2F] rounded-full flex items-center justify-center text-white font-bold">₮</div><div className="text-left"><p className="font-bold">USDT (BEP20)</p><p className="text-xs text-gray-500">BSC Network</p></div>
               </button>
             </div>
           )}
 
           {step === 'pay' && (
             <div className="space-y-4">
-              <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex items-center justify-between border border-orange-100">
-                <span className="text-sm font-medium">Rate locked for</span>
-                <span className="font-bold font-mono text-lg">{formatTime(timeLeft)}</span>
-              </div>
-              <div className="text-center py-4">
-                <p className="text-sm text-gray-500 mb-1">Send exactly</p>
-                <p className="text-2xl font-bold text-gray-900">${Math.floor(product.price_usd)} USD</p>
-                <p className="text-sm font-medium text-orange-500 mt-1">in {selectedCoin.replace('_', ' ')}</p>
-              </div>
+              <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex items-center justify-between border border-orange-100"><span className="text-sm font-medium">Rate locked for</span><span className="font-bold font-mono text-lg">{formatTime(timeLeft)}</span></div>
+              <div className="text-center py-4"><p className="text-sm text-gray-500 mb-1">Send exactly</p><p className="text-2xl font-bold text-gray-900">${Math.floor(product.price_usd)} USD</p><p className="text-sm font-medium text-orange-500 mt-1">in {selectedCoin.replace('_', ' ')}</p></div>
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                 <p className="text-xs font-bold text-gray-400 uppercase mb-2">Wallet Address</p>
                 <p className="font-mono text-sm break-all text-gray-800">{walletAddresses[selectedCoin]}</p>
-                <button onClick={handleCopy} className="mt-3 w-full flex items-center justify-center gap-2 bg-white border border-gray-200 py-2.5 rounded-lg font-semibold text-sm active:scale-95 transition-transform">
-                  {copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
-                  {copied ? 'Copied!' : 'Copy Address'}
-                </button>
+                <button onClick={handleCopy} className="mt-3 w-full flex items-center justify-center gap-2 bg-white border border-gray-200 py-2.5 rounded-lg font-semibold text-sm active:scale-95 transition-transform">{copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}{copied ? 'Copied!' : 'Copy Address'}</button>
               </div>
               <button onClick={() => { haptic.success(); setStep('hash'); }} className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 active:scale-95 transition-transform">I have sent the payment</button>
             </div>
@@ -192,13 +158,9 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
             <div className="space-y-4">
               <p className="text-sm text-gray-600">Paste your Transaction Hash (TXID) below.</p>
               <input type="text" value={txHash} onChange={(e) => setTxHash(e.target.value)} placeholder="Paste transaction hash..." className="w-full bg-gray-50 border border-gray-200 p-4 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
-              <button onClick={handleSubmit} disabled={loading || !txHash.trim()} className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-2">
-                <ShieldCheck size={18} />
-                {loading ? 'Submitting...' : 'Verify & Get Account'}
-              </button>
+              <button onClick={handleSubmit} disabled={loading || !txHash.trim()} className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-2"><ShieldCheck size={18} />{loading ? 'Submitting...' : 'Verify & Get Account'}</button>
             </div>
           )}
-
         </motion.div>
       </motion.div>
     </AnimatePresence>

@@ -44,6 +44,7 @@ export default function AdminPage() {
   const [prodDeliveryInfo, setProdDeliveryInfo] = useState('')
   const [prodIsVault, setProdIsVault] = useState(false)
   const [selectedCountryCode, setSelectedCountryCode] = useState('')
+  const [localPreview, setLocalPreview] = useState<string | null>(null)
 
   const [supportUrl, setSupportUrl] = useState('')
   const [proofsUrl, setProofsUrl] = useState('')
@@ -62,6 +63,16 @@ export default function AdminPage() {
     upsert: true,
   })
 
+  // Set the preview when a file is selected
+  useEffect(() => {
+    if (uploadProps.files && uploadProps.files.length > 0 && uploadProps.files[0].preview) {
+      setLocalPreview(uploadProps.files[0].preview as string)
+    } else {
+      setLocalPreview(null)
+    }
+  }, [uploadProps.files])
+
+  // Set the final image URL after upload succeeds
   useEffect(() => {
     if (uploadProps.isSuccess && uploadProps.successes.length > 0 && uploadProps.successes[0]) {
       const supabase = createClient()
@@ -178,11 +189,11 @@ export default function AdminPage() {
   }
 
   const resetForm = () => {
-    setEditId(null); setProdTitle(''); setProdPrice(''); setProdImage(''); setProdFields({}); setProdDeliveryInfo(''); setProdIsVault(false); setSelectedCountryCode(''); setShowProdForm(false); uploadProps.setFiles([])
+    setEditId(null); setProdTitle(''); setProdPrice(''); setProdImage(''); setProdFields({}); setProdDeliveryInfo(''); setProdIsVault(false); setSelectedCountryCode(''); setShowProdForm(false); uploadProps.setFiles([]); setLocalPreview(null)
   }
 
   const handleEditClick = (product: any) => {
-    setEditId(product.id); setProdTitle(product.title); setProdCategory(product.category); setProdPrice(product.price_usd.toString()); setProdImage(product.image_url || ''); setProdFields(product.metadata || {}); setProdDeliveryInfo(product.delivery_info || ''); setProdIsVault(product.is_vault_only || false); setSelectedCountryCode(product.metadata?.Country || ''); setShowProdForm(true); window.scrollTo({ top: 0, behavior: 'smooth' })
+    setEditId(product.id); setProdTitle(product.title); setProdCategory(product.category); setProdPrice(product.price_usd.toString()); setProdImage(product.image_url || ''); setProdFields(product.metadata || {}); setProdDeliveryInfo(product.delivery_info || ''); setProdIsVault(product.is_vault_only || false); setSelectedCountryCode(product.metadata?.Country || ''); setShowProdForm(true); setLocalPreview(null); window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleSaveProduct = async () => {
@@ -360,8 +371,12 @@ export default function AdminPage() {
                 {selectedSchema?.has_image && (
                   <div>
                     <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Product Image</p>
-                    {prodImage && <img src={prodImage} alt="Preview" className="w-16 h-16 rounded-lg object-cover mb-2 border border-gray-600" />}
-                    <Dropzone {...uploadProps}>{uploadProps.isSuccess ? <DropzoneContent /> : <DropzoneEmptyState />}</Dropzone>
+                    {(localPreview || prodImage) && (
+                      <img src={localPreview || prodImage} alt="Preview" className="w-20 h-20 rounded-lg object-cover mb-3 border border-gray-600" />
+                    )}
+                    <Dropzone {...uploadProps}>
+                      {uploadProps.isSuccess ? <DropzoneContent /> : <DropzoneEmptyState />}
+                    </Dropzone>
                   </div>
                 )}
 

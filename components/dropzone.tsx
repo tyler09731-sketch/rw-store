@@ -15,14 +15,12 @@ export const formatBytes = (
   const k = 1000
   const dm = decimals < 0 ? 0 : decimals
   const sizes = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-
   if (bytes === 0 || bytes === undefined) return size !== undefined ? `0 ${size}` : '0 bytes'
   const i = size !== undefined ? sizes.indexOf(size) : Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
 }
 
-type DropzoneContextType = Omit<UseSupabaseUploadReturn, 'getRootProps' | 'getInputProps'>
-
+type DropzoneContextType = Omit<UseSupabaseUploadReturn, 'getRootProps' | 'getInputProps' | 'open'>
 const DropzoneContext = createContext<DropzoneContextType | undefined>(undefined)
 
 type DropzoneProps = UseSupabaseUploadReturn & {
@@ -34,6 +32,7 @@ const Dropzone = ({
   children,
   getRootProps,
   getInputProps,
+  open,
   ...restProps
 }: PropsWithChildren<DropzoneProps>) => {
   const isSuccess = restProps.isSuccess
@@ -47,8 +46,9 @@ const Dropzone = ({
     <DropzoneContext.Provider value={{ ...restProps }}>
       <div
         {...getRootProps({
+          onClick: open,
           className: cn(
-            'border-2 border-gray-300 rounded-lg p-6 text-center bg-card transition-colors duration-300 text-foreground',
+            'border-2 border-gray-300 rounded-lg p-6 text-center bg-card transition-colors duration-300 text-foreground cursor-pointer',
             className,
             isSuccess ? 'border-solid' : 'border-dashed',
             isActive && 'border-primary bg-primary/10',
@@ -62,6 +62,7 @@ const Dropzone = ({
     </DropzoneContext.Provider>
   )
 }
+
 const DropzoneContent = ({ className }: { className?: string }) => {
   const {
     files,
@@ -104,11 +105,11 @@ const DropzoneContent = ({ className }: { className?: string }) => {
         return (
           <div
             key={`${file.name}-${idx}`}
-            className="flex items-center gap-x-4 border-b py-2 first:mt-4 last:mb-4 "
+            className="flex items-center gap-x-4 border-b py-2 first:mt-4 last:mb-4"
           >
             {file.type.startsWith('image/') ? (
               <div className="h-10 w-10 rounded-sm border overflow-hidden shrink-0 bg-muted flex items-center justify-center">
-                <img src={file.preview} alt={file.name} className="object-cover" />
+                <img src={file.preview} alt={file.name} className="object-cover w-full h-full" />
               </div>
             ) : (
               <div className="h-10 w-10 rounded-sm border bg-muted flex items-center justify-center">

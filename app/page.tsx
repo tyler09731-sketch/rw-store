@@ -310,7 +310,7 @@ export default function Storefront() {
                         ) : col === 'Exp' ? (
                           <span className="block">{formatExp(p.metadata[col])}</span>
                         ) : col === 'Balance' ? (
-                          <span className="block text-green-600 font-bold">{formatBalance(p.metadata[col])}</span>
+                          <span className="block text-green-600 font-bold break-words line-clamp-2">{formatBalance(p.metadata[col])}</span>
                         ) : col === 'Address' || col === 'Email' ? (
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${p.metadata[col] === 'Yes' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>{p.metadata[col] || '-'}</span>
                         ) : (
@@ -358,7 +358,7 @@ export default function Storefront() {
                     paddingBottom: '12px',
                   }}
                 >
-                  <div className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative">
+                  <div className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative overflow-hidden">
                     <div className="flex items-start gap-3 mb-3">
                       {product.image_url ? (
                         <img src={product.image_url} alt={product.title} loading="lazy" className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
@@ -372,11 +372,11 @@ export default function Storefront() {
                     </div>
 
                     <div className="my-3">
-                      <p className="text-green-600 font-extrabold text-3xl tracking-tight leading-none">
+                      <p className="text-green-600 font-extrabold text-2xl tracking-tight leading-tight break-words line-clamp-2">
                         {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
                       </p>
                       {product.metadata.BIN && (
-                        <p className="text-xs text-gray-500 mt-1 font-medium">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
+                        <p className="text-xs text-gray-500 mt-1 font-medium truncate">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
                       )}
                     </div>
 

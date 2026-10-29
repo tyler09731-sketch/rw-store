@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3, UserX, UserCheck, Vault, Crown } from 'lucide-react'
+import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3, UserX, UserCheck, Vault, Crown, Wallet, Bitcoin } from 'lucide-react'
 import { Country, State } from 'country-state-city'
 import { toast } from 'sonner'
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/dropzone'
@@ -21,9 +21,10 @@ export default function AdminPage() {
   const [topups, setTopups] = useState<any[]>([])
   const [vaultPayments, setVaultPayments] = useState<any[]>([])
   const [settings, setSettings] = useState<any>(null)
+  const [cryptoMethods, setCryptoMethods] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'vault' | 'settings'>('inventory')
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'vault' | 'crypto' | 'settings'>('inventory')
   
   const [balanceInputs, setBalanceInputs] = useState<Record<number, string>>({})
   const [savedUserId, setSavedUserId] = useState<number | null>(null)
@@ -50,6 +51,16 @@ export default function AdminPage() {
   const [supportUrl, setSupportUrl] = useState('')
   const [proofsUrl, setProofsUrl] = useState('')
   const [guidesUrl, setGuidesUrl] = useState('')
+
+  // Crypto Form State
+  const [showCryptoForm, setShowCryptoForm] = useState(false)
+  const [cryptoEditId, setCryptoEditId] = useState<number | null>(null)
+  const [cryptoName, setCryptoName] = useState('')
+  const [cryptoSymbol, setCryptoSymbol] = useState('')
+  const [cryptoNetwork, setCryptoNetwork] = useState('')
+  const [cryptoWallet, setCryptoWallet] = useState('')
+  const [cryptoRecommended, setCryptoRecommended] = useState(false)
+  const [cryptoEmoji, setCryptoEmoji] = useState('₮')
 
   const countries = Country.getAllCountries()
   const availableStates = selectedCountryCode ? State.getStatesOfCountry(selectedCountryCode) : []
@@ -93,6 +104,7 @@ export default function AdminPage() {
             fetch(`/api/admin/users?password=${saved}`).then(ur => ur.json()).then(ud => setUsersList(ud.users || []))
             fetch(`/api/topups?password=${saved}`).then(tr => tr.json()).then(td => setTopups(td.topups || []))
             fetch(`/api/admin/vault?password=${saved}`).then(vr => vr.json()).then(vd => setVaultPayments(vd.payments || []))
+            fetch(`/api/admin/crypto`).then(cr => cr.json()).then(cd => setCryptoMethods(cd.methods || []))
             fetch('/api/admin/settings').then(sr => sr.json()).then(sd => {
               setSettings(sd); setSupportUrl(sd.support_url || ''); setProofsUrl(sd.proofs_url || ''); setGuidesUrl(sd.guides_url || '')
             })
@@ -130,6 +142,11 @@ export default function AdminPage() {
     if (res.ok) { const d = await res.json(); setVaultPayments(d.payments || []) }
   }
 
+  const fetchCrypto = async () => {
+    const res = await fetch('/api/admin/crypto')
+    if (res.ok) { const d = await res.json(); setCryptoMethods(d.methods || []) }
+  }
+
   const fetchSettings = async () => {
     const res = await fetch('/api/admin/settings')
     if (res.ok) {
@@ -144,7 +161,7 @@ export default function AdminPage() {
     const ok = await fetchData()
     if (ok) {
       localStorage.setItem('rw_admin_pw', password)
-      await fetchOrders(); await fetchUsers(); await fetchTopups(); await fetchVaultPayments(); await fetchSettings()
+      await fetchOrders(); await fetchUsers(); await fetchTopups(); await fetchVaultPayments(); await fetchCrypto(); await fetchSettings()
     }
     setLoading(false)
   }
@@ -261,6 +278,35 @@ export default function AdminPage() {
     toast.success(action === 'approve' ? 'Seller access granted' : 'Seller access rejected')
   }
 
+  // --- CRYPTO HANDLERS ---
+  const resetCryptoForm = () => {
+    setCryptoEditId(null); setCryptoName(''); setCryptoSymbol(''); setCryptoNetwork(''); setCryptoWallet(''); setCryptoRecommended(false); setCryptoEmoji('₮'); setShowCryptoForm(false)
+  }
+
+  const handleEditCrypto = (m: any) => {
+    setCryptoEditId(m.id); setCryptoName(m.name); setCryptoSymbol(m.symbol); setCryptoNetwork(m.network || ''); setCryptoWallet(m.wallet_address); setCryptoRecommended(m.is_recommended); setCryptoEmoji(m.icon_emoji || '₮'); setShowCryptoForm(true); window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleSaveCrypto = async () => {
+    if (!cryptoName || !cryptoWallet) { toast.error('Name and Wallet Address are required'); return }
+    const payload = { password, name: cryptoName, symbol: cryptoSymbol || cryptoName.toUpperCase(), network: cryptoNetwork, wallet_address: cryptoWallet, is_recommended: cryptoRecommended, icon_emoji: cryptoEmoji }
+    if (cryptoEditId) {
+      await fetch('/api/admin/crypto', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: cryptoEditId }) })
+    } else {
+      await fetch('/api/admin/crypto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    }
+    toast.success(cryptoEditId ? 'Crypto method updated' : 'Crypto method added')
+    resetCryptoForm(); fetchCrypto()
+  }
+
+  const handleDeleteCrypto = async (id: number) => {
+    if (confirm('Delete this crypto method?')) {
+      await fetch(`/api/admin/crypto?password=${password}&id=${id}`, { method: 'DELETE' })
+      fetchCrypto()
+      toast.success('Crypto method deleted')
+    }
+  }
+
   const selectedSchema = data?.schemas.find((s: any) => s.category === prodCategory)
 
   if (!isAuthenticated) {
@@ -315,6 +361,7 @@ export default function AdminPage() {
           <button onClick={() => { setActiveTab('orders'); fetchOrders() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Orders ({orders.filter(o => o.status === 'pending').length})</button>
           <button onClick={() => { setActiveTab('topups'); fetchTopups() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'topups' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Top-Ups ({topups.filter(t => t.status === 'pending').length})</button>
           <button onClick={() => { setActiveTab('vault'); fetchVaultPayments() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'vault' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Vault ({vaultPayments.filter((v: any) => v.status === 'pending').length})</button>
+          <button onClick={() => { setActiveTab('crypto'); fetchCrypto() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'crypto' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Crypto</button>
           <button onClick={() => { setActiveTab('users'); fetchUsers() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'users' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Users</button>
           <button onClick={() => { setActiveTab('settings'); fetchSettings() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'settings' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Settings</button>
         </div>
@@ -581,6 +628,59 @@ export default function AdminPage() {
                 </div>
               ))
             )}
+          </div>
+        )}
+
+        {activeTab === 'crypto' && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <button onClick={() => { resetCryptoForm(); setShowCryptoForm(!showCryptoForm); }} className="flex-1 flex items-center justify-center gap-2 text-xs md:text-sm font-semibold bg-orange-500 text-white px-3 py-2.5 rounded-lg hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><Bitcoin size={14} /> Add Crypto</button>
+            </div>
+
+            {showCryptoForm && (
+              <div className={`bg-gray-800 p-4 rounded-2xl border-2 ${cryptoEditId ? 'border-orange-500' : 'border-gray-700'} space-y-3`}>
+                <div className="flex justify-between items-center">
+                  <h2 className="font-bold text-white">{cryptoEditId ? 'Edit Crypto' : 'New Crypto Method'}</h2>
+                  {cryptoEditId && <button onClick={resetCryptoForm} className="text-xs text-red-400 font-semibold">Cancel</button>}
+                </div>
+                <input placeholder="Name (e.g. USDT)" value={cryptoName} onChange={e => setCryptoName(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <input placeholder="Symbol (e.g. USDT)" value={cryptoSymbol} onChange={e => setCryptoSymbol(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <input placeholder="Network (e.g. TRC20)" value={cryptoNetwork} onChange={e => setCryptoNetwork(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <input placeholder="Wallet Address" value={cryptoWallet} onChange={e => setCryptoWallet(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <input placeholder="Emoji Icon (e.g. ₮ or ₿)" value={cryptoEmoji} onChange={e => setCryptoEmoji(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                <label className="flex items-center gap-2 p-2.5 bg-gray-700 rounded-lg cursor-pointer border border-gray-600">
+                  <input type="checkbox" checked={cryptoRecommended} onChange={e => setCryptoRecommended(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+                  <span className="text-xs font-medium text-gray-200">Set as Recommended (Fastest / Lowest Fee)</span>
+                </label>
+                <button onClick={handleSaveCrypto} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">{cryptoEditId ? 'Update Crypto' : 'Save Crypto'}</button>
+              </div>
+            )}
+
+            <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+              <div className="p-3 border-b border-gray-700 bg-gray-800/50"><h2 className="font-bold text-white text-sm">Active Crypto Methods ({cryptoMethods.length})</h2></div>
+              <div className="divide-y divide-gray-700">
+                {cryptoMethods.length === 0 ? (
+                  <div className="p-6 text-center text-gray-400 text-sm">No crypto methods yet. Add one above.</div>
+                ) : (
+                  cryptoMethods.map((m: any) => (
+                    <div key={m.id} className="p-3 flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{m.icon_emoji}</span>
+                          <p className="font-semibold text-xs text-white truncate">{m.name} {m.network && <span className="text-gray-400">({m.network})</span>}</p>
+                          {m.is_recommended && <span className="text-[9px] font-bold bg-orange-900/50 text-orange-400 px-1.5 py-0.5 rounded border border-orange-700">REC</span>}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-mono truncate">{m.wallet_address}</p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button onClick={() => handleEditCrypto(m)} className="text-blue-400 p-1.5 bg-blue-900/30 rounded"><Pencil size={14} /></button>
+                        <button onClick={() => handleDeleteCrypto(m.id)} className="text-red-400 p-1.5 bg-red-900/30 rounded"><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         )}
 

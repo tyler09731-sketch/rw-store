@@ -18,12 +18,14 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
   const [loading, setLoading] = useState(false)
   const [orderRef, setOrderRef] = useState('')
 
+  // Timer for the pay step
   useEffect(() => {
     if (step !== 'pay') return
     const timer = setInterval(() => { setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0)) }, 1000)
     return () => clearInterval(timer)
   }, [step])
 
+  // Telegram BackButton setup
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     if (!tg?.BackButton) return
@@ -31,7 +33,10 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
       tg.BackButton.show()
       tg.BackButton.onClick(() => {
         haptic.light()
-        if (step === 'pay') setStep('select')
+        if (step === 'pay') {
+          setSelectedMethod(null) // Reset method when going back
+          setStep('select')
+        }
         if (step === 'hash') setStep('pay')
       })
     } else { tg.BackButton.hide() }
@@ -45,6 +50,7 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
   }
 
   const handleCopy = () => {
+    if (!selectedMethod?.wallet_address) return
     navigator.clipboard.writeText(selectedMethod.wallet_address)
     haptic.success()
     setCopied(true)
@@ -58,8 +64,18 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
     onClose()
   }
 
+  const handleSelectMethod = (m: any) => {
+    // CRITICAL: Only accept a method if it has a wallet address
+    if (!m || !m.wallet_address) {
+      alert('This payment method is not configured. Contact support.')
+      return
+    }
+    setSelectedMethod(m)
+    setStep('pay')
+  }
+
   const handleSubmit = async () => {
-    if (!txHash.trim() || !selectedMethod) return
+    if (!txHash.trim() || !selectedMethod?.wallet_address) return
     setLoading(true)
     haptic.success()
     const ref = `RW-${Date.now().toString().slice(-6)}`
@@ -81,7 +97,7 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               {step !== 'select' && step !== 'success' && (
-                <button onClick={() => { haptic.light(); if (step === 'pay') setStep('select'); if (step === 'hash') setStep('pay') }} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full"><ChevronLeft size={20} /></button>
+                <button onClick={() => { haptic.light(); if (step === 'pay') { setSelectedMethod(null); setStep('select'); } if (step === 'hash') setStep('pay'); }} className="p-2 -ml-2 text-orange-500 bg-orange-50 rounded-full"><ChevronLeft size={20} /></button>
               )}
               <h2 className="text-xl font-bold">{step === 'success' ? 'Order Submitted' : step === 'select' ? 'Select Payment' : step === 'pay' ? 'Complete Payment' : 'Confirm Payment'}</h2>
             </div>
@@ -101,11 +117,12 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
           {step === 'select' && (
             <CryptoSelector 
               selectedId={selectedMethod?.id || null}
-              onSelect={(m) => { setSelectedMethod(m); setStep('pay') }} 
+              onSelect={handleSelectMethod} 
             />
           )}
 
-          {step === 'pay' && selectedMethod && (
+          {/* CRITICAL FIX: Only render the pay step if selectedMethod AND wallet_address exist */}
+          {step === 'pay' && selectedMethod?.wallet_address && (
             <div className="space-y-4">
               <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex items-center justify-between border border-orange-100"><span className="text-sm font-medium">Rate locked for</span><span className="font-bold font-mono text-lg">{formatTime(timeLeft)}</span></div>
               <div className="text-center py-4"><p className="text-sm text-gray-500 mb-1">Send exactly</p><p className="text-2xl font-bold text-gray-900">${Math.floor(product.price_usd)} USD</p><p className="text-sm font-medium text-orange-500 mt-1">in {selectedMethod.name} {selectedMethod.network}</p></div>

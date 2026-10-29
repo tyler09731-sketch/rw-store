@@ -1,6 +1,7 @@
 'use client'
 
-import { X, Package, ShoppingCart } from 'lucide-react'
+import { useEffect } from 'react'
+import { X, Package } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { haptic } from '@/lib/haptics'
 
@@ -23,16 +24,33 @@ export default function ProductDetailSheet({
   onClose: () => void
   onBuy: (product: Product) => void 
 }) {
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    if (!tg?.MainButton || !product) return
+
+    tg.MainButton.setText(`Buy Now — $${Math.floor(product.price_usd)}`)
+    tg.MainButton.color = '#F97316'
+    tg.MainButton.textColor = '#FFFFFF'
+    tg.MainButton.show()
+
+    const handleMainClick = () => {
+      if (!product) return
+      haptic.medium()
+      onBuy(product)
+      onClose()
+    }
+    tg.MainButton.onClick(handleMainClick)
+
+    return () => {
+      tg.MainButton.offClick(handleMainClick)
+      tg.MainButton.hide()
+    }
+  }, [product, onBuy, onClose])
+
   if (!product) return null
 
   const metadata = product.metadata || {}
   const metaEntries = Object.entries(metadata).filter(([k, v]) => v && v !== '-' && v !== 'N/A')
-
-  const handleBuyClick = () => {
-    haptic.medium()
-    onBuy(product)
-    onClose()
-  }
 
   return (
     <AnimatePresence>
@@ -45,7 +63,7 @@ export default function ProductDetailSheet({
           initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-16 max-h-[85vh] overflow-y-auto"
+          className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-32 max-h-[85vh] overflow-y-auto"
         >
           <div className="flex justify-between items-start mb-4">
             <div className="flex items-center gap-3">
@@ -74,17 +92,12 @@ export default function ProductDetailSheet({
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Price</p>
               <p className="text-3xl font-extrabold text-gray-900">${Math.floor(product.price_usd)}</p>
             </div>
-            <button 
-              onClick={handleBuyClick}
-              className="bg-orange-500 text-white px-8 py-3.5 rounded-xl font-bold text-base shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2"
-            >
-              <ShoppingCart size={18} /> Buy Now
-            </button>
+            <p className="text-xs text-gray-400 text-right">Tap the button below to checkout</p>
           </div>
         </motion.div>
       </motion.div>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useDeferredValue } from 'react'
+import { useEffect, useState, useDeferredValue, useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { matchSorter } from 'match-sorter'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Package, ChevronRight, X, SlidersHorizontal, Zap } from 'lucide-react'
@@ -73,6 +74,8 @@ export default function Storefront() {
   const [filterModal, setFilterModal] = useState<string | null>(null)
   const [shuffledAllProducts, setShuffledAllProducts] = useState<Product[]>([])
 
+  const parentRef = useRef<HTMLDivElement>(null)
+
   const fetchData = async () => {
     setLoading(true)
     try {
@@ -143,19 +146,9 @@ export default function Storefront() {
 
   const sourceList = activeCategory === 'All' ? shuffledAllProducts : products
 
-  // STEP C: Word-by-word search with match-sorter
   const filteredProducts = deferredSearch.trim()
     ? matchSorter(sourceList, deferredSearch, {
-        keys: [
-          'title',
-          'metadata.Balance',
-          'metadata.Bank',
-          'metadata.BIN',
-          'metadata.Level',
-          'metadata.Network',
-          'metadata.Country',
-          'category'
-        ],
+        keys: ['title', 'metadata.Balance', 'metadata.Bank', 'metadata.BIN', 'metadata.Level', 'metadata.Network', 'metadata.Country', 'category'],
         threshold: matchSorter.rankings.WORD_STARTS_WITH
       }).filter((p: Product) => {
         const matchesCategory = activeCategory === 'All' || p.category === activeCategory
@@ -175,6 +168,13 @@ export default function Storefront() {
           return p.metadata[key] === value
         })
       })
+
+  const rowVirtualizer = useVirtualizer({
+    count: filteredProducts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 240,
+    overscan: 5,
+  })
 
   const hasActiveFilters = Object.values(activeFilters).some(v => v)
 
@@ -211,9 +211,18 @@ export default function Storefront() {
           </div>
         </div>
 
-        <div className="relative mb-4">
+        <div className="relative mb-4 scroll-mt-32">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input type="text" placeholder="Search bank, BIN, balance..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-xl shadow-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm" />
+          <input 
+            type="text" 
+            placeholder="Search bank, BIN, balance..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)}
+            onFocus={(e) => {
+              setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
+            }}
+            className="w-full bg-white pl-10 pr-4 py-3.5 rounded-xl shadow-sm border border-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm" 
+          />
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
@@ -243,8 +252,8 @@ export default function Storefront() {
 
       <ActivityTicker />
 
-      {activeCategory === 'All' && !loading && featuredProducts.length > 0 && (
-        <div className="px-4 pt-4 pb-2">
+      {activeCategory === 'All' && !loading && featuredProducts.length > 0 && !search.trim() && (
+        <div className="px-4 pt-4 pb-2 relative z-0">
           <div className="flex items-center gap-1 mb-2">
             <Zap size={14} className="text-orange-500" />
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Fresh Drops</h2>
@@ -320,58 +329,79 @@ export default function Storefront() {
           </div>
         </div>
       ) : (
-        <div className="px-4 pt-2 space-y-3 w-full max-w-full">
-          <AnimatePresence>
-            {filteredProducts.map((product, index) => (
-              <motion.div 
-                key={product.id} 
-                initial={{ opacity: 0, y: 20 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                exit={{ opacity: 0, scale: 0.95 }} 
-                transition={{ duration: 0.2, delay: index * 0.05 }} 
-                className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative"
-              >
-                <div className="flex items-start gap-3 mb-3">
-                  {product.image_url ? (
-                    <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
-                  ) : (
-                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-base text-gray-900 leading-tight truncate">{product.title}</h3>
-                    <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">{product.category}</span>
+        <div 
+          ref={parentRef} 
+          className="px-4 pt-2 w-full max-w-full overflow-y-auto"
+          style={{ height: 'calc(100dvh - 220px)' }}
+        >
+          <div 
+            style={{ 
+              height: `${rowVirtualizer.getTotalSize()}px`, 
+              width: '100%', 
+              position: 'relative' 
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const product = filteredProducts[virtualRow.index]
+              if (!product) return null
+              return (
+                <div
+                  key={product.id}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                    paddingBottom: '12px',
+                  }}
+                >
+                  <div className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative">
+                    <div className="flex items-start gap-3 mb-3">
+                      {product.image_url ? (
+                        <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
+                      ) : (
+                        <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-base text-gray-900 leading-tight truncate">{product.title}</h3>
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">{product.category}</span>
+                      </div>
+                    </div>
+
+                    <div className="my-3">
+                      <p className="text-green-600 font-extrabold text-3xl tracking-tight leading-none">
+                        {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
+                      </p>
+                      {product.metadata.BIN && (
+                        <p className="text-xs text-gray-500 mt-1 font-medium">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {Object.entries(product.metadata)
+                        .filter(([key]) => ['Level', 'Network', 'Bank'].includes(key))
+                        .map(([key, value]: [string, any]) => (
+                          <span key={key} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md">{value}</span>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p>
+                        <p className="text-xl font-extrabold text-gray-900">{formatPrice(product.price_usd)}</p>
+                      </div>
+                      <button onClick={() => { haptic.medium(); setDetailProduct(product) }} className="bg-orange-500 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2">
+                        <Package size={16} /> View
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="my-3">
-                  <p className="text-green-600 font-extrabold text-3xl tracking-tight leading-none">
-                    {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
-                  </p>
-                  {product.metadata.BIN && (
-                    <p className="text-xs text-gray-500 mt-1 font-medium">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {Object.entries(product.metadata)
-                    .filter(([key]) => ['Level', 'Network', 'Bank'].includes(key))
-                    .map(([key, value]: [string, any]) => (
-                      <span key={key} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md">{value}</span>
-                    ))}
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
-                  <div>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p>
-                    <p className="text-xl font-extrabold text-gray-900">{formatPrice(product.price_usd)}</p>
-                  </div>
-                  <button onClick={() => { haptic.medium(); setDetailProduct(product); }} className="bg-orange-500 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2">
-                    <Package size={16} /> View
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+              )
+            })}
+          </div>
         </div>
       )}
 

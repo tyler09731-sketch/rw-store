@@ -38,14 +38,11 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
   const [errors, setErrors] = useState<{ name: string; message: string }[]>([])
   const [successes, setSuccesses] = useState<string[]>([])
   const uploadInProgress = useRef(false)
+  const attemptedUploads = useRef<Set<string>>(new Set())
 
   const isSuccess = useMemo(() => {
-    if (errors.length === 0 && successes.length === 0) {
-      return false
-    }
-    if (errors.length === 0 && successes.length === files.length) {
-      return true
-    }
+    if (errors.length === 0 && successes.length === 0) return false
+    if (errors.length === 0 && successes.length === files.length) return true
     return false
   }, [errors.length, successes.length, files.length])
 
@@ -68,7 +65,6 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
       })
 
       const newFiles = [...files, ...validFiles, ...invalidFiles]
-
       setFiles(newFiles)
     },
     [files, setFiles]
@@ -123,13 +119,18 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
     setLoading(false)
   }, [files, path, bucketName, errors, successes])
 
-  // AUTO-UPLOAD: fires whenever new files are added
+  // AUTO-UPLOAD with retry prevention
   useEffect(() => {
     const hasNewFiles = files.some(
-      (f) => f.errors.length === 0 && !successes.includes(f.name)
+      (f) => f.errors.length === 0 && !successes.includes(f.name) && !attemptedUploads.current.has(f.name)
     )
     if (hasNewFiles && !loading && !uploadInProgress.current) {
       uploadInProgress.current = true
+      files.forEach((f) => {
+        if (!successes.includes(f.name) && f.errors.length === 0) {
+          attemptedUploads.current.add(f.name)
+        }
+      })
       onUpload().finally(() => {
         uploadInProgress.current = false
       })
@@ -139,6 +140,7 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
   useEffect(() => {
     if (files.length === 0) {
       setErrors([])
+      attemptedUploads.current.clear()
     }
 
     if (files.length <= maxFiles) {
@@ -150,9 +152,7 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
         }
         return file
       })
-      if (changed) {
-        setFiles(newFiles)
-      }
+      if (changed) setFiles(newFiles)
     }
   }, [files.length, setFiles, maxFiles])
 

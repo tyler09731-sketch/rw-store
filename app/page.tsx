@@ -100,7 +100,7 @@ export default function Storefront() {
         if (latestOrder && latestOrder.id !== lastNotifiedOrderId.current) {
           toast.success(`Order #${latestOrder.order_ref} Delivered!`, {
             description: `${(latestOrder.products as any)?.[0]?.title || 'Your item'} is ready.`,
-            duration: 5000,
+            duration: 10000,
           })
           lastNotifiedOrderId.current = latestOrder.id
         }

@@ -29,7 +29,7 @@ export default function ActivityTicker() {
       toast(activity.text, {
         description: activity.time,
         icon: <Zap size={16} className="text-orange-500" />,
-        duration: 4000,
+        duration: 10000,
         position: 'top-right',
         id: 'activity-ticker', // Same ID → replaces instead of stacking
       })
@@ -40,7 +40,7 @@ export default function ActivityTicker() {
     showNext()
 
     // Then rotate every 6 seconds
-    const interval = setInterval(showNext, 6000)
+    const interval = setInterval(showNext, 12000)
 
     return () => clearInterval(interval)
   }, [activities])

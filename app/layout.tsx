@@ -69,7 +69,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           `
         }} />
         {children}
-        <Toaster position="top-center" richColors />
+        <Toaster 
+          position="top-right"
+          richColors
+          toastOptions={{
+            className: 'mobile-toast-narrow',
+            style: {
+              padding: '12px 16px',
+              fontSize: '13px',
+              maxWidth: 'fit-content',
+            },
+          }}
+        />
       </body>
     </html>
   );

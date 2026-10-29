@@ -29,18 +29,16 @@ export default function ActivityTicker() {
       const activity = activities[shownCount.current]
       toast(activity.text, {
         description: activity.time,
-        icon: <Zap size={16} className="text-orange-500" />,
+        icon: <Zap size={14} className="text-orange-500" />,
         duration: 10000,
         position: 'top-right',
         id: 'activity-ticker',
+        className: 'mobile-toast-narrow',
       })
       shownCount.current += 1
     }
 
-    // Show first activity after 2 seconds
     const firstTimeout = setTimeout(showNext, 2000)
-
-    // Then advance every 12 seconds until all 5 are shown
     const interval = setInterval(showNext, 12000)
 
     return () => {

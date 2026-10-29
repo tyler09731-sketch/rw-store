@@ -3,7 +3,7 @@
 import { useEffect, useState, useDeferredValue } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
-import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X, SlidersHorizontal, Zap } from 'lucide-react'
+import { Search, RotateCw, Package, ChevronRight, X, SlidersHorizontal, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { getFlagEmoji } from '@/lib/getFlag'
 import { haptic } from '@/lib/haptics'
@@ -15,6 +15,13 @@ import ProfilePage from './profile/page'
 import VaultPage from './vault/page'
 import ActivityTicker from '@/components/ActivityTicker'
 import ProductDetailSheet from '@/components/ProductDetailSheet'
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from '@/components/ui/carousel'
 
 type Product = {
   id: number
@@ -162,7 +169,7 @@ export default function Storefront() {
     setFilterModal(null)
   }
 
-  const featuredProducts = products.slice(0, 3)
+  const featuredProducts = products.slice(0, 5)
 
   if (activeTab === 'orders') return <><OrdersPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} /></>
   if (activeTab === 'wallet') return <><WalletPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} /></>
@@ -178,7 +185,6 @@ export default function Storefront() {
             <h1 className="font-bold text-xl tracking-tight">Store 2.0</h1>
           </div>
           <div className="flex items-center gap-2">
-            {/* REPLACED: Total product count */}
             <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-full shadow-sm border border-gray-100 text-xs font-medium">
               <Package size={12} className="text-orange-500" />
               {products.length} products
@@ -227,21 +233,35 @@ export default function Storefront() {
             <Zap size={14} className="text-orange-500" />
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Fresh Drops</h2>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {featuredProducts.map((p) => (
-              <button key={p.id} onClick={() => { haptic.medium(); setDetailProduct(p); }} className="bg-gray-900 rounded-2xl p-4 min-w-[200px] text-left shrink-0 border border-gray-800 shadow-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  {p.image_url ? (
-                    <Image src={p.image_url} alt={p.title} width={24} height={24} className="w-6 h-6 rounded-md object-cover" />
-                  ) : (
-                    <div className="w-6 h-6 bg-orange-500/20 rounded-md flex items-center justify-center text-orange-400 text-xs font-bold">RW</div>
-                  )}
-                  <span className="text-[10px] font-bold text-orange-400 uppercase">{p.category}</span>
-                </div>
-                <p className="text-white font-bold text-sm truncate mb-1">{p.title}</p>
-                <p className="text-green-400 font-bold text-lg">{formatPrice(p.price_usd)}</p>
-              </button>
-            ))}
+          <div className="relative">
+            <Carousel
+              opts={{ align: "start", loop: true }}
+              className="w-full"
+            >
+              <CarouselContent className="-ml-3">
+                {featuredProducts.map((p) => (
+                  <CarouselItem key={p.id} className="pl-3 basis-[200px]">
+                    <button 
+                      onClick={() => { haptic.medium(); setDetailProduct(p); }} 
+                      className="bg-gray-900 rounded-2xl p-4 text-left w-full border border-gray-800 shadow-lg active:scale-95 transition-transform"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        {p.image_url ? (
+                          <Image src={p.image_url} alt={p.title} width={24} height={24} className="w-6 h-6 rounded-md object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 bg-orange-500/20 rounded-md flex items-center justify-center text-orange-400 text-xs font-bold">RW</div>
+                        )}
+                        <span className="text-[10px] font-bold text-orange-400 uppercase">{p.category}</span>
+                      </div>
+                      <p className="text-white font-bold text-sm truncate mb-1">{p.title}</p>
+                      <p className="text-green-400 font-bold text-lg">{formatPrice(p.price_usd)}</p>
+                    </button>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden md:flex -left-4 bg-white border-gray-200" />
+              <CarouselNext className="hidden md:flex -right-4 bg-white border-gray-200" />
+            </Carousel>
           </div>
         </div>
       )}
@@ -309,8 +329,6 @@ export default function Storefront() {
                 transition={{ duration: 0.2, delay: index * 0.05 }} 
                 className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative"
               >
-                {/* REMOVED: 1 left badge */}
-
                 <div className="flex items-start gap-3 mb-3">
                   {product.image_url ? (
                     <Image src={product.image_url} alt={product.title} width={48} height={48} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />

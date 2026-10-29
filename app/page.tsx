@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useDeferredValue } from 'react'
-import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Package, ChevronRight, X, SlidersHorizontal, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
@@ -15,13 +14,6 @@ import ProfilePage from './profile/page'
 import VaultPage from './vault/page'
 import ActivityTicker from '@/components/ActivityTicker'
 import ProductDetailSheet from '@/components/ProductDetailSheet'
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselPrevious,
-  CarouselNext,
-} from '@/components/ui/carousel'
 
 type Product = {
   id: number
@@ -233,35 +225,21 @@ export default function Storefront() {
             <Zap size={14} className="text-orange-500" />
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Fresh Drops</h2>
           </div>
-          <div className="relative">
-            <Carousel
-              opts={{ align: "start", loop: true }}
-              className="w-full"
-            >
-              <CarouselContent className="-ml-3">
-                {featuredProducts.map((p) => (
-                  <CarouselItem key={p.id} className="pl-3 basis-[200px]">
-                    <button 
-                      onClick={() => { haptic.medium(); setDetailProduct(p); }} 
-                      className="bg-gray-900 rounded-2xl p-4 text-left w-full border border-gray-800 shadow-lg active:scale-95 transition-transform"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        {p.image_url ? (
-                          <Image src={p.image_url} alt={p.title} width={24} height={24} className="w-6 h-6 rounded-md object-cover" />
-                        ) : (
-                          <div className="w-6 h-6 bg-orange-500/20 rounded-md flex items-center justify-center text-orange-400 text-xs font-bold">RW</div>
-                        )}
-                        <span className="text-[10px] font-bold text-orange-400 uppercase">{p.category}</span>
-                      </div>
-                      <p className="text-white font-bold text-sm truncate mb-1">{p.title}</p>
-                      <p className="text-green-400 font-bold text-lg">{formatPrice(p.price_usd)}</p>
-                    </button>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="hidden md:flex -left-4 bg-white border-gray-200" />
-              <CarouselNext className="hidden md:flex -right-4 bg-white border-gray-200" />
-            </Carousel>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {featuredProducts.map((p) => (
+              <button key={p.id} onClick={() => { haptic.medium(); setDetailProduct(p); }} className="bg-gray-900 rounded-2xl p-4 min-w-[200px] text-left shrink-0 border border-gray-800 shadow-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  {p.image_url ? (
+                    <img src={p.image_url} alt={p.title} className="w-6 h-6 rounded-md object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 bg-orange-500/20 rounded-md flex items-center justify-center text-orange-400 text-xs font-bold">RW</div>
+                  )}
+                  <span className="text-[10px] font-bold text-orange-400 uppercase">{p.category}</span>
+                </div>
+                <p className="text-white font-bold text-sm truncate mb-1">{p.title}</p>
+                <p className="text-green-400 font-bold text-lg">{formatPrice(p.price_usd)}</p>
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -331,7 +309,7 @@ export default function Storefront() {
               >
                 <div className="flex items-start gap-3 mb-3">
                   {product.image_url ? (
-                    <Image src={product.image_url} alt={product.title} width={48} height={48} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
+                    <img src={product.image_url} alt={product.title} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
                   ) : (
                     <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
                   )}

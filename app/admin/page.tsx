@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3, UserX, UserCheck, Vault, Crown } from 'lucide-react'
 import { Country, State } from 'country-state-city'
+import { toast } from 'sonner'
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/dropzone'
 import { useSupabaseUpload } from '@/hooks/use-supabase-upload'
 import { createClient } from '@/lib/supabase/client'
@@ -148,6 +149,7 @@ export default function AdminPage() {
     if (confirm(`${is_blocked ? 'Unban' : 'Ban'} this user?`)) {
       await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, telegram_id, is_blocked: !is_blocked }) })
       fetchUsers()
+      toast.success(is_blocked ? 'User unbanned' : 'User banned')
     }
   }
 
@@ -155,21 +157,24 @@ export default function AdminPage() {
     if (confirm(`${is_vip ? 'Remove VIP from' : 'Make'} this user ${is_vip ? '' : 'VIP'}?`)) {
       await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, telegram_id, is_vip: !is_vip }) })
       fetchUsers()
+      toast.success(is_vip ? 'VIP removed' : 'VIP granted')
     }
   }
 
   const handleUpdateBalance = async (telegram_id: number) => {
     const newBal = parseFloat(balanceInputs[telegram_id] || '0')
-    if (isNaN(newBal)) { alert('Invalid number'); return }
+    if (isNaN(newBal)) { toast.error('Invalid number'); return }
     await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, telegram_id, balance: newBal }) })
     fetchUsers()
     setSavedUserId(telegram_id)
+    toast.success('Balance updated')
     setTimeout(() => setSavedUserId(null), 2000)
   }
 
   const handleSaveSettings = async () => {
     const res = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, support_url: supportUrl, proofs_url: proofsUrl, guides_url: guidesUrl }) })
-    if (res.ok) { alert('Settings saved successfully'); fetchSettings() }
+    if (res.ok) { toast.success('Settings saved'); fetchSettings() }
+    else { toast.error('Failed to save settings') }
   }
 
   const resetForm = () => {
@@ -184,23 +189,39 @@ export default function AdminPage() {
     const finalMetadata = { ...prodFields }
     if (selectedCountryCode) finalMetadata['Country'] = selectedCountryCode
     const payload = { password, title: prodTitle, category: prodCategory, price_usd: prodPrice, image_url: prodImage, metadata: finalMetadata, delivery_info: prodDeliveryInfo, is_vault_only: prodIsVault }
+    
     if (editId) {
-      await fetch('/api/admin/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: editId }) })
+      const res = await fetch('/api/admin/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: editId }) })
+      if (res.ok) {
+        toast.success('Product updated')
+        resetForm()
+        fetchData()
+      } else {
+        toast.error('Failed to update product')
+      }
     } else {
-      await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, action: 'add_product' }) })
+      const res = await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, action: 'add_product' }) })
+      if (res.ok) {
+        toast.success('Product created')
+        resetForm()
+        fetchData()
+      } else {
+        toast.error('Failed to create product')
+      }
     }
-    resetForm(); fetchData()
   }
 
   const handleToggleSold = async (id: number, currentStatus: boolean) => {
     await fetch('/api/admin/products', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id, is_sold: !currentStatus }) })
     fetchData()
+    toast.success(currentStatus ? 'Product available' : 'Product marked sold')
   }
 
   const handleDelete = async (id: number) => {
     if (confirm('Delete this product?')) {
       await fetch(`/api/admin/products?password=${password}&id=${id}`, { method: 'DELETE' })
       fetchData()
+      toast.success('Product deleted')
     }
   }
 
@@ -208,22 +229,26 @@ export default function AdminPage() {
     const fields = newCatFields.filter(f => f.trim() !== '').map(f => ({ name: f, type: 'text' }))
     await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, action: 'add_category', category: newCatName, fields, default_view: newCatView, has_image: newCatHasImage }) })
     setShowCatForm(false); setNewCatName(''); setNewCatFields(['']); setNewCatHasImage(false); fetchData()
+    toast.success('Category created')
   }
 
   const handleConfirmOrder = async (orderId: number, deliveryInfo: string) => {
-    if (!deliveryInfo.trim()) { alert('Please enter delivery info'); return }
+    if (!deliveryInfo.trim()) { toast.error('Please enter delivery info'); return }
     const res = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id: orderId, delivery_info: deliveryInfo }) })
-    if (res.ok) { alert('Order confirmed and user notified!'); fetchOrders() }
+    if (res.ok) { toast.success('Order confirmed and user notified'); fetchOrders() }
+    else { toast.error('Failed to confirm order') }
   }
 
   const handleTopupAction = async (id: number, action: 'approve' | 'reject') => {
     await fetch('/api/topups', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id, action }) })
     fetchTopups(); fetchData()
+    toast.success(action === 'approve' ? 'Top-up approved' : 'Top-up rejected')
   }
 
   const handleVaultAction = async (id: number, action: 'approve' | 'reject') => {
     await fetch('/api/admin/vault', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id, action }) })
     fetchVaultPayments()
+    toast.success(action === 'approve' ? 'Seller access granted' : 'Seller access rejected')
   }
 
   const selectedSchema = data?.schemas.find((s: any) => s.category === prodCategory)
@@ -474,10 +499,7 @@ export default function AdminPage() {
                 <div key={v.id} className={`bg-gray-800 rounded-2xl border p-4 space-y-3 ${v.status === 'pending' ? 'border-yellow-700/50' : v.status === 'confirmed' ? 'border-green-700/50' : 'border-red-700/50'}`}>
                   <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Crown size={12} className="text-orange-400" />
-                        <h3 className="font-bold text-white text-sm">Seller Access — ${v.amount}</h3>
-                      </div>
+                      <div className="flex items-center gap-1 mb-1"><Crown size={12} className="text-orange-400" /><h3 className="font-bold text-white text-sm">Seller Access — ${v.amount}</h3></div>
                       <p className="text-[10px] text-gray-400 truncate">User: @{v.users?.username || 'unknown'} ({v.user_id})</p>
                       <p className="text-[10px] text-gray-400 truncate">TXID: {v.tx_hash}</p>
                       <p className="text-[10px] text-gray-400 truncate">Coin: {v.crypto_coin}</p>

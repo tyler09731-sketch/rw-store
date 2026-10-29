@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/dropzone'
 import { useSupabaseUpload } from '@/hooks/use-supabase-upload'
 import { createClient } from '@/lib/supabase/client'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const CARD_LEVELS = ['Standard', 'Silver', 'Gold', 'Platinum', 'Titanium', 'Signature', 'Infinite', 'World Elite', 'Business']
 const CARD_NETWORKS = ['Visa', 'Mastercard', 'Amex', 'Discover', 'JCB', 'UnionPay']
@@ -63,7 +64,6 @@ export default function AdminPage() {
     upsert: true,
   })
 
-  // Set the preview when a file is selected
   useEffect(() => {
     if (uploadProps.files && uploadProps.files.length > 0 && uploadProps.files[0].preview) {
       setLocalPreview(uploadProps.files[0].preview as string)
@@ -72,7 +72,6 @@ export default function AdminPage() {
     }
   }, [uploadProps.files])
 
-  // Set the final image URL after upload succeeds
   useEffect(() => {
     if (uploadProps.isSuccess && uploadProps.successes.length > 0 && uploadProps.successes[0]) {
       const supabase = createClient()
@@ -381,10 +380,62 @@ export default function AdminPage() {
                 )}
 
                 {selectedSchema && selectedSchema.fields.map((field: any) => {
-                  if (field.name === 'Country') return <select key={field.name} value={selectedCountryCode} onChange={e => { setSelectedCountryCode(e.target.value); setProdFields({...prodFields, [field.name]: e.target.value}) }} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="">Select Country</option>{countries.map((c: any) => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}</select>
-                  if (field.name === 'State' && hasStates) return <select key={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="">Select State</option>{availableStates.map((s: any) => <option key={s.isoCode} value={s.isoCode}>{s.name} ({s.isoCode})</option>)}</select>
-                  if (field.name === 'Level') return <select key={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="">Select Level</option>{CARD_LEVELS.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}</select>
-                  if (field.name === 'Network') return <select key={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="">Select Network</option>{CARD_NETWORKS.map(net => <option key={net} value={net}>{net}</option>)}</select>
+                  if (field.name === 'Country') {
+                    return (
+                      <Select key={field.name} value={selectedCountryCode} onValueChange={(val) => { setSelectedCountryCode(val || ''); setProdFields({...prodFields, [field.name]: val || ''}) }}>
+                        <SelectTrigger className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
+                          <SelectValue placeholder="Select Country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countries.map((c: any) => (
+                            <SelectItem key={c.isoCode} value={c.isoCode}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )
+                  }
+                  if (field.name === 'State' && hasStates) {
+                    return (
+                      <Select key={field.name} value={prodFields[field.name] || ''} onValueChange={(val) => setProdFields({...prodFields, [field.name]: val || ''})}>
+                        <SelectTrigger className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
+                          <SelectValue placeholder="Select State" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableStates.map((s: any) => (
+                            <SelectItem key={s.isoCode} value={s.isoCode}>{s.name} ({s.isoCode})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )
+                  }
+                  if (field.name === 'Level') {
+                    return (
+                      <Select key={field.name} value={prodFields[field.name] || ''} onValueChange={(val) => setProdFields({...prodFields, [field.name]: val || ''})}>
+                        <SelectTrigger className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
+                          <SelectValue placeholder="Select Level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CARD_LEVELS.map(lvl => (
+                            <SelectItem key={lvl} value={lvl}>{lvl}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )
+                  }
+                  if (field.name === 'Network') {
+                    return (
+                      <Select key={field.name} value={prodFields[field.name] || ''} onValueChange={(val) => setProdFields({...prodFields, [field.name]: val || ''})}>
+                        <SelectTrigger className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
+                          <SelectValue placeholder="Select Network" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CARD_NETWORKS.map(net => (
+                            <SelectItem key={net} value={net}>{net}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )
+                  }
                   return <input key={field.name} placeholder={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
                 })}
 

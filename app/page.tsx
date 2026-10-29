@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useDeferredValue } from 'react'
+import { matchSorter } from 'match-sorter'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Package, ChevronRight, X, SlidersHorizontal, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
@@ -142,15 +143,38 @@ export default function Storefront() {
 
   const sourceList = activeCategory === 'All' ? shuffledAllProducts : products
 
-  const filteredProducts = sourceList.filter(p => {
-    const searchString = `${p.title} ${JSON.stringify(p.metadata)}`.toLowerCase()
-    const matchesSearch = searchString.includes(deferredSearch.toLowerCase())
-    const matchesCategory = activeCategory === 'All' || p.category === activeCategory
-    if (!matchesCategory) return false
-    if (!isTableView) return matchesSearch
-    const matchesFilters = Object.entries(activeFilters).every(([key, value]) => { if (!value) return true; return p.metadata[key] === value })
-    return matchesSearch && matchesFilters
-  })
+  // STEP C: Word-by-word search with match-sorter
+  const filteredProducts = deferredSearch.trim()
+    ? matchSorter(sourceList, deferredSearch, {
+        keys: [
+          'title',
+          'metadata.Balance',
+          'metadata.Bank',
+          'metadata.BIN',
+          'metadata.Level',
+          'metadata.Network',
+          'metadata.Country',
+          'category'
+        ],
+        threshold: matchSorter.rankings.WORD_STARTS_WITH
+      }).filter((p: Product) => {
+        const matchesCategory = activeCategory === 'All' || p.category === activeCategory
+        if (!matchesCategory) return false
+        if (!isTableView) return true
+        return Object.entries(activeFilters).every(([key, value]) => {
+          if (!value) return true
+          return p.metadata[key] === value
+        })
+      })
+    : sourceList.filter(p => {
+        const matchesCategory = activeCategory === 'All' || p.category === activeCategory
+        if (!matchesCategory) return false
+        if (!isTableView) return true
+        return Object.entries(activeFilters).every(([key, value]) => {
+          if (!value) return true
+          return p.metadata[key] === value
+        })
+      })
 
   const hasActiveFilters = Object.values(activeFilters).some(v => v)
 

@@ -376,7 +376,13 @@ export default function Storefront() {
         onBuy={(p) => { setSelectedProduct(p); setDetailProduct(null) }} 
       />
 
-      {selectedProduct && <CheckoutModal product={selectedProduct} onClose={() => setSelectedProduct(null)} userId={user?.id || 0} />}
+      {selectedProduct && user?.id && (
+        <CheckoutModal 
+          product={selectedProduct} 
+          onClose={() => setSelectedProduct(null)} 
+          userId={user.id} 
+        />
+      )}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} />
     </main>
   )

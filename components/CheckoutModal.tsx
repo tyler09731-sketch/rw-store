@@ -18,14 +18,12 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
   const [loading, setLoading] = useState(false)
   const [orderRef, setOrderRef] = useState('')
 
-  // Timer for the pay step
   useEffect(() => {
     if (step !== 'pay') return
     const timer = setInterval(() => { setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0)) }, 1000)
     return () => clearInterval(timer)
   }, [step])
 
-  // Telegram BackButton setup
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     if (!tg?.BackButton) return
@@ -33,10 +31,7 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
       tg.BackButton.show()
       tg.BackButton.onClick(() => {
         haptic.light()
-        if (step === 'pay') {
-          setSelectedMethod(null) // Reset method when going back
-          setStep('select')
-        }
+        if (step === 'pay') { setSelectedMethod(null); setStep('select') }
         if (step === 'hash') setStep('pay')
       })
     } else { tg.BackButton.hide() }
@@ -65,7 +60,6 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
   }
 
   const handleSelectMethod = (m: any) => {
-    // CRITICAL: Only accept a method if it has a wallet address
     if (!m || !m.wallet_address) {
       alert('This payment method is not configured. Contact support.')
       return
@@ -76,6 +70,10 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
 
   const handleSubmit = async () => {
     if (!txHash.trim() || !selectedMethod?.wallet_address) return
+    if (!userId) {
+      alert('User session not ready. Please close and reopen the app.')
+      return
+    }
     setLoading(true)
     haptic.success()
     const ref = `RW-${Date.now().toString().slice(-6)}`
@@ -121,7 +119,6 @@ export default function CheckoutModal({ product, onClose, userId }: { product: P
             />
           )}
 
-          {/* CRITICAL FIX: Only render the pay step if selectedMethod AND wallet_address exist */}
           {step === 'pay' && selectedMethod?.wallet_address && (
             <div className="space-y-4">
               <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex items-center justify-between border border-orange-100"><span className="text-sm font-medium">Rate locked for</span><span className="font-bold font-mono text-lg">{formatTime(timeLeft)}</span></div>

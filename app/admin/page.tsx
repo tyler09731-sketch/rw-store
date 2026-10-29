@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'settings'>('inventory')
   
   const [balanceInputs, setBalanceInputs] = useState<Record<number, string>>({})
+  const [savedUserId, setSavedUserId] = useState<number | null>(null)
 
   const [showCatForm, setShowCatForm] = useState(false)
   const [showProdForm, setShowProdForm] = useState(false)
@@ -38,7 +39,7 @@ export default function AdminPage() {
   const [prodPrice, setProdPrice] = useState('')
   const [prodImage, setProdImage] = useState('')
   const [prodFields, setProdFields] = useState<Record<string, string>>({})
-  const [prodDeliveryInfo, setProdDeliveryInfo] = useState('') // <-- NEW
+  const [prodDeliveryInfo, setProdDeliveryInfo] = useState('')
   const [selectedCountryCode, setSelectedCountryCode] = useState('')
 
   const [supportUrl, setSupportUrl] = useState('')
@@ -69,68 +70,42 @@ export default function AdminPage() {
 
   const fetchData = async () => {
     const res = await fetch(`/api/admin/products?password=${password}`)
-    if (res.ok) {
-      setData(await res.json())
-      setIsAuthenticated(true)
-    } else {
-      setError('Invalid password')
-    }
+    if (res.ok) { setData(await res.json()); setIsAuthenticated(true) } else { setError('Invalid password') }
   }
 
   const fetchOrders = async () => {
     const res = await fetch(`/api/admin/orders?password=${password}`)
-    if (res.ok) {
-      const orderData = await res.json()
-      setOrders(orderData.orders || [])
-    }
+    if (res.ok) { const d = await res.json(); setOrders(d.orders || []) }
   }
 
   const fetchUsers = async () => {
     const res = await fetch(`/api/admin/users?password=${password}`)
-    if (res.ok) {
-      const userData = await res.json()
-      setUsersList(userData.users || [])
-    }
+    if (res.ok) { const d = await res.json(); setUsersList(d.users || []) }
   }
 
   const fetchTopups = async () => {
     const res = await fetch(`/api/topups?password=${password}`)
-    if (res.ok) {
-      const d = await res.json()
-      setTopups(d.topups || [])
-    }
+    if (res.ok) { const d = await res.json(); setTopups(d.topups || []) }
   }
 
   const fetchSettings = async () => {
     const res = await fetch('/api/admin/settings')
     if (res.ok) {
       const s = await res.json()
-      setSettings(s)
-      setSupportUrl(s.support_url || '')
-      setProofsUrl(s.proofs_url || '')
-      setGuidesUrl(s.guides_url || '')
+      setSettings(s); setSupportUrl(s.support_url || ''); setProofsUrl(s.proofs_url || ''); setGuidesUrl(s.guides_url || '')
     }
   }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    await fetchData()
-    await fetchOrders()
-    await fetchUsers()
-    await fetchTopups()
-    await fetchSettings()
+    await fetchData(); await fetchOrders(); await fetchUsers(); await fetchTopups(); await fetchSettings()
     setLoading(false)
   }
 
   const handleToggleBan = async (telegram_id: number, is_blocked: boolean) => {
-    const action = is_blocked ? 'Unban' : 'Ban'
-    if (confirm(`${action} this user?`)) {
-      await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, telegram_id, is_blocked: !is_blocked })
-      })
+    if (confirm(`${is_blocked ? 'Unban' : 'Ban'} this user?`)) {
+      await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, telegram_id, is_blocked: !is_blocked }) })
       fetchUsers()
     }
   }
@@ -140,6 +115,8 @@ export default function AdminPage() {
     if (isNaN(newBal)) { alert('Invalid number'); return }
     await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, telegram_id, balance: newBal }) })
     fetchUsers()
+    setSavedUserId(telegram_id)
+    setTimeout(() => setSavedUserId(null), 2000)
   }
 
   const handleSaveSettings = async () => {
@@ -152,25 +129,13 @@ export default function AdminPage() {
   }
 
   const handleEditClick = (product: any) => {
-    setEditId(product.id)
-    setProdTitle(product.title)
-    setProdCategory(product.category)
-    setProdPrice(product.price_usd.toString())
-    setProdImage(product.image_url || '')
-    setProdFields(product.metadata || {})
-    setProdDeliveryInfo(product.delivery_info || '') // <-- NEW
-    setSelectedCountryCode(product.metadata?.Country || '')
-    setShowProdForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setEditId(product.id); setProdTitle(product.title); setProdCategory(product.category); setProdPrice(product.price_usd.toString()); setProdImage(product.image_url || ''); setProdFields(product.metadata || {}); setProdDeliveryInfo(product.delivery_info || ''); setSelectedCountryCode(product.metadata?.Country || ''); setShowProdForm(true); window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleSaveProduct = async () => {
     const finalMetadata = { ...prodFields }
     if (selectedCountryCode) finalMetadata['Country'] = selectedCountryCode
-    const payload = { 
-      password, title: prodTitle, category: prodCategory, price_usd: prodPrice, 
-      image_url: prodImage, metadata: finalMetadata, delivery_info: prodDeliveryInfo // <-- NEW
-    }
+    const payload = { password, title: prodTitle, category: prodCategory, price_usd: prodPrice, image_url: prodImage, metadata: finalMetadata, delivery_info: prodDeliveryInfo }
     if (editId) {
       await fetch('/api/admin/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: editId }) })
     } else {
@@ -197,17 +162,15 @@ export default function AdminPage() {
     setShowCatForm(false); setNewCatName(''); setNewCatFields(['']); setNewCatHasImage(false); fetchData()
   }
 
-  // UPDATED: Auto-fill the textarea with the product's delivery_info
   const handleConfirmOrder = async (orderId: number, deliveryInfo: string) => {
     if (!deliveryInfo.trim()) { alert('Please enter delivery info'); return }
     const res = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id: orderId, delivery_info: deliveryInfo }) })
-    if (res.ok) { alert('Order confirmed!'); fetchOrders() }
+    if (res.ok) { alert('Order confirmed and user notified!'); fetchOrders() }
   }
 
   const handleTopupAction = async (id: number, action: 'approve' | 'reject') => {
     await fetch('/api/topups', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id, action }) })
-    fetchTopups()
-    fetchData()
+    fetchTopups(); fetchData()
   }
 
   const selectedSchema = data?.schemas.find((s: any) => s.category === prodCategory)
@@ -328,16 +291,9 @@ export default function AdminPage() {
                   return <input key={field.name} placeholder={field.name} value={prodFields[field.name] || ''} onChange={e => setProdFields({...prodFields, [field.name]: e.target.value})} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
                 })}
 
-                {/* NEW: Delivery Info textarea */}
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Delivery Info (Account Credentials)</p>
-                  <textarea 
-                    value={prodDeliveryInfo} 
-                    onChange={e => setProdDeliveryInfo(e.target.value)} 
-                    placeholder="LOGIN: ... PASS: ... AN: ... RN: ..." 
-                    className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                    rows={4}
-                  />
+                  <textarea value={prodDeliveryInfo} onChange={e => setProdDeliveryInfo(e.target.value)} placeholder="LOGIN: ... PASS: ... AN: ... RN: ..." className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" rows={4} />
                   <p className="text-[10px] text-gray-500 mt-1">This info will auto-fill when you confirm an order for this product.</p>
                 </div>
                 
@@ -369,7 +325,6 @@ export default function AdminPage() {
               <div className="text-center py-20 text-gray-400 bg-gray-800 rounded-2xl border border-gray-700">No orders yet.</div>
             ) : (
               orders.map((order) => {
-                // Auto-fill from the product's delivery_info
                 const productInfo = order.products?.delivery_info || ''
                 return (
                   <div key={order.id} className={`bg-gray-800 rounded-2xl border p-5 space-y-3 ${order.status === 'pending' ? 'border-yellow-700/50 bg-yellow-900/10' : 'border-green-700/50 bg-green-900/10'}`}>
@@ -386,13 +341,7 @@ export default function AdminPage() {
                     {order.status === 'pending' ? (
                       <div className="pt-2 border-t border-gray-700">
                         <p className="text-xs font-bold text-gray-400 uppercase mb-1">Delivery Details {productInfo && <span className="text-green-400">(Auto-filled)</span>}</p>
-                        <textarea 
-                          id={`delivery-${order.id}`} 
-                          defaultValue={productInfo} 
-                          placeholder="LOGIN: ... PASS: ..." 
-                          className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                          rows={3} 
-                        />
+                        <textarea id={`delivery-${order.id}`} defaultValue={productInfo} placeholder="LOGIN: ... PASS: ..." className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" rows={3} />
                         <button onClick={() => { const el = document.getElementById(`delivery-${order.id}`) as HTMLTextAreaElement; handleConfirmOrder(order.id, el.value) }} className="mt-2 w-full bg-green-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">Confirm & Deliver</button>
                       </div>
                     ) : (
@@ -418,9 +367,7 @@ export default function AdminPage() {
                       <p className="text-xs text-gray-400">User: @{t.users?.username || 'unknown'} ({t.user_id})</p>
                       <p className="text-xs text-gray-400 break-all">TXID: {t.tx_hash}</p>
                     </div>
-                    <span className={`text-xs font-bold px-2 py-1 rounded ${t.status === 'pending' ? 'bg-yellow-900/50 text-yellow-400' : t.status === 'confirmed' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
-                      {t.status.toUpperCase()}
-                    </span>
+                    <span className={`text-xs font-bold px-2 py-1 rounded ${t.status === 'pending' ? 'bg-yellow-900/50 text-yellow-400' : t.status === 'confirmed' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>{t.status.toUpperCase()}</span>
                   </div>
                   
                   {t.status === 'pending' && (
@@ -444,18 +391,14 @@ export default function AdminPage() {
             <div className="divide-y divide-gray-700 max-h-[600px] overflow-y-auto">
               {usersList.map((u: any) => (
                 <div key={u.telegram_id} className={`p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 ${u.is_blocked ? 'bg-red-900/10 opacity-70' : ''}`}>
-                  
                   <div className="flex items-center gap-3 w-full">
                     <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 font-bold shrink-0">
                       {u.first_name ? u.first_name[0].toUpperCase() : '?'}
                     </div>
-                    
                     <div className="flex flex-col md:flex-row md:items-center justify-between w-full gap-2">
                       <div>
                         <p className="font-semibold text-sm text-white">{u.first_name || 'Unknown'} {u.username && <span className="text-xs text-gray-400">@{u.username}</span>}</p>
-                        <p className="text-xs text-gray-400">
-                          ID: {u.telegram_id} • Source: <span className="text-orange-400">{u.source || 'organic'}</span>
-                        </p>
+                        <p className="text-xs text-gray-400">ID: {u.telegram_id} • Source: <span className="text-orange-400">{u.source || 'organic'}</span></p>
                       </div>
 
                       <div className="flex items-center gap-2 bg-gray-900 p-1.5 rounded-lg border border-gray-700 w-fit">
@@ -467,11 +410,16 @@ export default function AdminPage() {
                           onChange={(e) => setBalanceInputs({...balanceInputs, [u.telegram_id]: e.target.value})}
                           className="w-16 bg-transparent text-white text-sm font-bold focus:outline-none"
                         />
+                        {/* FIXED: Saved state feedback */}
                         <button 
                           onClick={() => handleUpdateBalance(u.telegram_id)}
-                          className="text-[10px] bg-orange-500 text-white font-bold px-2 py-1 rounded hover:bg-orange-600 transition-colors"
+                          className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
+                            savedUserId === u.telegram_id 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-orange-500 text-white hover:bg-orange-600'
+                          }`}
                         >
-                          Save
+                          {savedUserId === u.telegram_id ? '✓ Saved!' : 'Save'}
                         </button>
                       </div>
                     </div>
@@ -479,11 +427,7 @@ export default function AdminPage() {
                   
                   <button 
                     onClick={() => handleToggleBan(u.telegram_id, u.is_blocked)} 
-                    className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition-colors shrink-0 ${
-                      u.is_blocked 
-                        ? 'bg-green-900/30 text-green-400 border border-green-700 hover:bg-green-900/50' 
-                        : 'bg-red-900/30 text-red-400 border border-red-700 hover:bg-red-900/50'
-                    }`}
+                    className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition-colors shrink-0 ${u.is_blocked ? 'bg-green-900/30 text-green-400 border border-green-700 hover:bg-green-900/50' : 'bg-red-900/30 text-red-400 border border-red-700 hover:bg-red-900/50'}`}
                   >
                     {u.is_blocked ? <><UserCheck size={14} /> Unban</> : <><UserX size={14} /> Ban</>}
                   </button>
@@ -499,7 +443,6 @@ export default function AdminPage() {
               <h2 className="font-bold text-white text-lg mb-1">Support & Community Links</h2>
               <p className="text-sm text-gray-400">These links are used across the Mini App.</p>
             </div>
-            
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Support URL</label>
               <input type="url" value={supportUrl} onChange={e => setSupportUrl(e.target.value)} placeholder="https://t.me/your_support" className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
@@ -512,7 +455,6 @@ export default function AdminPage() {
               <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Guides Channel URL</label>
               <input type="url" value={guidesUrl} onChange={e => setGuidesUrl(e.target.value)} placeholder="https://t.me/your_guides" className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
             </div>
-
             <button onClick={handleSaveSettings} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">Save Settings</button>
           </div>
         )}

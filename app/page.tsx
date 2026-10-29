@@ -37,8 +37,6 @@ export default function Storefront() {
   const [orderCount, setOrderCount] = useState(0)
   
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
-  
-  // NEW: State for the custom filter modal
   const [filterModal, setFilterModal] = useState<string | null>(null)
 
   const fetchData = async () => {
@@ -48,9 +46,7 @@ export default function Storefront() {
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'confirmed')
       if (prods) setProducts(prods)
       if (count) setOrderCount(count)
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
     setLoading(false)
   }
 
@@ -86,19 +82,9 @@ export default function Storefront() {
   const ccColumns = ['BIN', 'Exp', 'Country', 'Bank', 'Level', 'Network', 'Balance', 'Address', 'Email']
   const ccFilters = ['Country', 'Bank', 'Level', 'Network']
 
-  const formatExp = (exp: string) => {
-    if (!exp) return '-'
-    return exp.replace(/20(\d{2})/, '$1')
-  }
-
-  const formatBalance = (bal: string) => {
-    if (!bal) return '-'
-    return bal.includes('$') ? bal : `$${bal}`
-  }
-
-  const formatPrice = (price: number) => {
-    return `$${Math.floor(price)}`
-  }
+  const formatExp = (exp: string) => { if (!exp) return '-'; return exp.replace(/20(\d{2})/, '$1') }
+  const formatBalance = (bal: string) => { if (!bal) return '-'; return bal.includes('$') ? bal : `$${bal}` }
+  const formatPrice = (price: number) => { return `$${Math.floor(price)}` }
 
   const getFilterOptions = (fieldName: string) => {
     const categoryProducts = products.filter(p => p.category === activeCategory)
@@ -109,36 +95,18 @@ export default function Storefront() {
   const filteredProducts = products.filter(p => {
     const searchString = `${p.title} ${JSON.stringify(p.metadata)}`.toLowerCase()
     const matchesSearch = searchString.includes(deferredSearch.toLowerCase())
-    
-    if (activeCategory === 'All') {
-      if (p.category !== 'Banks') return false
-    } else if (activeCategory !== p.category) {
-      return false
-    }
-
+    if (activeCategory === 'All') { if (p.category !== 'Banks') return false } else if (activeCategory !== p.category) { return false }
     if (!isTableView) return matchesSearch
-
-    const matchesFilters = Object.entries(activeFilters).every(([key, value]) => {
-      if (!value) return true
-      return p.metadata[key] === value
-    })
+    const matchesFilters = Object.entries(activeFilters).every(([key, value]) => { if (!value) return true; return p.metadata[key] === value })
     return matchesSearch && matchesFilters
   })
 
   const hasActiveFilters = Object.values(activeFilters).some(v => v)
 
-  const clearFilters = () => {
-    haptic.light()
-    setActiveFilters({})
-  }
-
+  const clearFilters = () => { haptic.light(); setActiveFilters({}) }
   const applyFilter = (fieldName: string, value: string) => {
     haptic.success()
-    setActiveFilters(prev => {
-      const next = { ...prev }
-      if (value === '') { delete next[fieldName] } else { next[fieldName] = value }
-      return next
-    })
+    setActiveFilters(prev => { const next = { ...prev }; if (value === '') { delete next[fieldName] } else { next[fieldName] = value }; return next })
     setFilterModal(null)
   }
 
@@ -174,9 +142,7 @@ export default function Storefront() {
 
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
           {categories.map((cat) => (
-            <button key={cat} onClick={() => { haptic.light(); setActiveCategory(cat); }} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${activeCategory === cat ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-white text-gray-600 border border-gray-100'}`}>
-              {cat}
-            </button>
+            <button key={cat} onClick={() => { haptic.light(); setActiveCategory(cat); }} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${activeCategory === cat ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-white text-gray-600 border border-gray-100'}`}>{cat}</button>
           ))}
         </div>
 
@@ -186,26 +152,14 @@ export default function Storefront() {
               <SlidersHorizontal size={14} />
               <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
             </div>
-            
             {ccFilters.map((fieldName: string) => (
-              <button
-                key={fieldName}
-                onClick={() => { haptic.light(); setFilterModal(fieldName); }}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
-                  activeFilters[fieldName]
-                    ? 'bg-orange-500 text-white border-orange-500'
-                    : 'bg-white text-gray-600 border-gray-200'
-                }`}
-              >
+              <button key={fieldName} onClick={() => { haptic.light(); setFilterModal(fieldName); }} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${activeFilters[fieldName] ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-200'}`}>
                 {activeFilters[fieldName] ? activeFilters[fieldName] : fieldName}
                 {activeFilters[fieldName] ? <X size={12} onClick={(e) => { e.stopPropagation(); applyFilter(fieldName, ''); }} /> : <ChevronRight size={12} className="rotate-90" />}
               </button>
             ))}
-            
             {hasActiveFilters && (
-              <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-500 border border-red-100 whitespace-nowrap shrink-0">
-                Clear
-              </button>
+              <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-500 border border-red-100 whitespace-nowrap shrink-0">Clear</button>
             )}
           </div>
         )}
@@ -216,60 +170,39 @@ export default function Storefront() {
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
           <p>No products found.</p>
-          {hasActiveFilters && (
-            <button onClick={clearFilters} className="text-orange-500 text-sm font-semibold mt-2">Clear filters</button>
-          )}
+          {hasActiveFilters && <button onClick={clearFilters} className="text-orange-500 text-sm font-semibold mt-2">Clear filters</button>}
         </div>
       ) : isTableView ? (
         <div className="px-4 pt-2 w-full max-w-full relative">
-          <div className="flex items-center gap-1 text-xs text-gray-400 font-medium mb-1 ml-1">
-            <span>← Swipe to see details →</span>
-          </div>
-          
+          <div className="flex items-center gap-1 text-xs text-gray-400 font-medium mb-1 ml-1"><span>← Swipe to see details →</span></div>
           <div className="overflow-x-auto w-full pb-20 relative z-0">
             <table className="w-full min-w-[800px] relative text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
                 <tr>
-                  {ccColumns.map((col) => (
-                    <th key={col} className="p-3 font-semibold whitespace-nowrap">{col}</th>
-                  ))}
+                  {ccColumns.map((col) => <th key={col} className="p-3 font-semibold whitespace-nowrap">{col}</th>)}
                   <th className="p-3 font-semibold whitespace-nowrap">Price</th>
                   <th className="p-3 w-16"></th>
                 </tr>
               </thead>
               <motion.tbody className="divide-y divide-gray-50">
                 {filteredProducts.map((p, index) => (
-                  <motion.tr 
-                    key={p.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="hover:bg-gray-50/50"
-                  >
+                  <motion.tr key={p.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.05 }} className="hover:bg-gray-50/50">
                     {ccColumns.map((col) => (
                       <td key={col} className="p-3 text-sm whitespace-nowrap">
                         {col === 'Country' ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-base leading-none">{getFlagEmoji(p.metadata['Country'] || 'US')}</span>
-                            <span className="font-medium">{p.metadata['Country'] === 'GB' ? 'UK' : p.metadata['Country']}</span>
-                          </div>
+                          <div className="flex items-center gap-1.5"><span className="text-base leading-none">{getFlagEmoji(p.metadata['Country'] || 'US')}</span><span className="font-medium">{p.metadata['Country'] === 'GB' ? 'UK' : p.metadata['Country']}</span></div>
                         ) : col === 'Exp' ? (
                           <span className="block">{formatExp(p.metadata[col])}</span>
                         ) : col === 'Balance' ? (
                           <span className="block text-green-600 font-bold">{formatBalance(p.metadata[col])}</span>
                         ) : col === 'Address' || col === 'Email' ? (
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                            p.metadata[col] === 'Yes' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'
-                          }`}>
-                            {p.metadata[col] || '-'}
-                          </span>
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${p.metadata[col] === 'Yes' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>{p.metadata[col] || '-'}</span>
                         ) : (
                           <span className="block max-w-[120px] truncate" title={String(p.metadata[col] || '')}>{p.metadata[col] || '-'}</span>
                         )}
                       </td>
                     ))}
                     <td className="p-3 text-sm font-bold whitespace-nowrap text-orange-600">{formatPrice(p.price_usd)}</td>
-                    
                     <td className="p-3 text-right sticky right-0 z-10 bg-white shadow-[-8px_0_10px_rgba(0,0,0,0.05)]">
                       <button onClick={() => { haptic.medium(); setSelectedProduct(p); }} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm active:scale-95 transition-transform">Buy</button>
                     </td>
@@ -283,14 +216,7 @@ export default function Storefront() {
         <div className="px-4 pt-2 space-y-3 w-full max-w-full">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (
-              <motion.div 
-                key={product.id} 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2, delay: index * 0.05 }}
-                className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full"
-              >
+              <motion.div key={product.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2, delay: index * 0.05 }} className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
                     {product.image_url ? (
@@ -298,41 +224,22 @@ export default function Storefront() {
                     ) : (
                       <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
                     )}
-                    <div>
-                      <h3 className="font-bold text-base text-gray-900 leading-tight">{product.title}</h3>
-                      <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">
-                        {product.category}
-                      </span>
-                    </div>
+                    <div><h3 className="font-bold text-base text-gray-900 leading-tight">{product.title}</h3><span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">{product.category}</span></div>
                   </div>
                   <ChevronRight className="text-gray-300" size={20} />
                 </div>
-
                 <div className="my-3">
-                  <p className="text-green-600 font-extrabold text-2xl tracking-tight">
-                    {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
-                  </p>
+                  <p className="text-green-600 font-extrabold text-2xl tracking-tight">{product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}</p>
                   {product.metadata.Description && <p className="text-xs font-medium text-gray-500 mt-1">{product.metadata.Description}</p>}
-                  
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {Object.entries(product.metadata)
-                      .filter(([key]) => ['Level', 'Network', 'Bank'].includes(key))
-                      .map(([key, value]: [string, any]) => (
-                        <span key={key} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md">
-                          {value}
-                        </span>
-                      ))}
+                    {Object.entries(product.metadata).filter(([key]) => ['Level', 'Network', 'Bank'].includes(key)).map(([key, value]: [string, any]) => (
+                      <span key={key} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md">{value}</span>
+                    ))}
                   </div>
                 </div>
-
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
-                  <div>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p>
-                    <p className="text-2xl font-extrabold text-gray-900">{formatPrice(product.price_usd)}</p>
-                  </div>
-                  <button onClick={() => { haptic.medium(); setSelectedProduct(product); }} className="bg-orange-500 text-white px-7 py-3 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2">
-                    <Package size={16} /> Buy Now
-                  </button>
+                  <div><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p><p className="text-2xl font-extrabold text-gray-900">{formatPrice(product.price_usd)}</p></div>
+                  <button onClick={() => { haptic.medium(); setSelectedProduct(product); }} className="bg-orange-500 text-white px-7 py-3 rounded-xl font-bold text-sm shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] active:scale-95 transition-transform flex items-center gap-2"><Package size={16} /> Buy Now</button>
                 </div>
               </motion.div>
             ))}
@@ -340,46 +247,18 @@ export default function Storefront() {
         </div>
       )}
 
-      {/* NEW: Custom Bottom Sheet Filter Modal */}
       <AnimatePresence>
         {filterModal && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
-            onClick={() => setFilterModal(null)}
-          >
-            <motion.div 
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10 max-h-[70vh] flex flex-col"
-            >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" onClick={() => setFilterModal(null)}>
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10 max-h-[70vh] flex flex-col">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold">Select {filterModal}</h2>
-                <button onClick={() => setFilterModal(null)} className="p-2 bg-gray-100 rounded-full text-gray-500">
-                  <X size={20} />
-                </button>
+                <button onClick={() => setFilterModal(null)} className="p-2 bg-gray-100 rounded-full text-gray-500"><X size={20} /></button>
               </div>
-              
               <div className="overflow-y-auto space-y-2 pr-2">
-                <button 
-                  onClick={() => applyFilter(filterModal, '')}
-                  className={`w-full text-left p-4 rounded-xl font-medium border transition-colors ${
-                    !activeFilters[filterModal] ? 'bg-orange-50 border-orange-500 text-orange-600' : 'bg-white border-gray-100 text-gray-700'
-                  }`}
-                >
-                  All
-                </button>
+                <button onClick={() => applyFilter(filterModal, '')} className={`w-full text-left p-4 rounded-xl font-medium border transition-colors ${!activeFilters[filterModal] ? 'bg-orange-50 border-orange-500 text-orange-600' : 'bg-white border-gray-100 text-gray-700'}`}>All</button>
                 {getFilterOptions(filterModal).map((option: string) => (
-                  <button 
-                    key={option}
-                    onClick={() => applyFilter(filterModal, option)}
-                    className={`w-full text-left p-4 rounded-xl font-medium border transition-colors ${
-                      activeFilters[filterModal] === option ? 'bg-orange-50 border-orange-500 text-orange-600' : 'bg-white border-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {option}
-                  </button>
+                  <button key={option} onClick={() => applyFilter(filterModal, option)} className={`w-full text-left p-4 rounded-xl font-medium border transition-colors ${activeFilters[filterModal] === option ? 'bg-orange-50 border-orange-500 text-orange-600' : 'bg-white border-gray-100 text-gray-700'}`}>{option}</button>
                 ))}
               </div>
             </motion.div>
@@ -387,7 +266,7 @@ export default function Storefront() {
         )}
       </AnimatePresence>
 
-      {selectedProduct && <CheckoutModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
+      {selectedProduct && <CheckoutModal product={selectedProduct} onClose={() => setSelectedProduct(null)} userId={user?.id || 0} />}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </main>
   )

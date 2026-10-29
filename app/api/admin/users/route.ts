@@ -25,13 +25,13 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   const body = await req.json()
-  const { password, telegram_id, is_blocked, balance } = body
+  const { password, telegram_id, is_blocked, balance, is_vip } = body
 
   if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // If it's a ban/unban action
+  // Ban / Unban
   if (typeof is_blocked === 'boolean') {
     const { error } = await supabaseAdmin
       .from('users')
@@ -41,11 +41,21 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true })
   }
 
-  // If it's a balance update action
+  // Update Balance
   if (typeof balance === 'number') {
     const { error } = await supabaseAdmin
       .from('users')
       .update({ balance })
+      .eq('telegram_id', telegram_id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  // VIP toggle
+  if (typeof is_vip === 'boolean') {
+    const { error } = await supabaseAdmin
+      .from('users')
+      .update({ is_vip })
       .eq('telegram_id', telegram_id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })

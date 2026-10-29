@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useDeferredValue, useMemo } from 'react'
+import { useEffect, useState, useDeferredValue } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Package, ChevronRight, CheckCircle2, X, SlidersHorizontal, Zap } from 'lucide-react'
@@ -12,6 +12,7 @@ import BottomNav from '@/components/BottomNav'
 import OrdersPage from './orders/page'
 import WalletPage from './wallet/page'
 import ProfilePage from './profile/page'
+import VaultPage from './vault/page'
 import ActivityTicker from '@/components/ActivityTicker'
 import ProductDetailSheet from '@/components/ProductDetailSheet'
 
@@ -25,7 +26,7 @@ type Product = {
   is_sold: boolean
 }
 
-type Tab = 'items' | 'orders' | 'wallet' | 'profile'
+type Tab = 'items' | 'orders' | 'wallet' | 'vault' | 'profile'
 
 function SkeletonCard() {
   return (
@@ -46,7 +47,6 @@ function SkeletonCard() {
   )
 }
 
-// Fisher-Yates Shuffle
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -68,27 +68,32 @@ export default function Storefront() {
   const [activeTab, setActiveTab] = useState<Tab>('items')
   const [user, setUser] = useState<{ id: number, first_name: string, username: string, photo_url?: string, balance?: number } | null>(null)
   const [orderCount, setOrderCount] = useState(0)
+  const [vaultUnlocked, setVaultUnlocked] = useState(false)
   
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
   const [filterModal, setFilterModal] = useState<string | null>(null)
-
-  // Store the shuffled array for "All" tab
   const [shuffledAllProducts, setShuffledAllProducts] = useState<Product[]>([])
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).order('created_at', { ascending: false })
+      const { data: prods } = await supabase.from('products').select('*').eq('is_sold', false).eq('is_vault_only', false).order('created_at', { ascending: false })
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'confirmed')
-      
       if (prods) {
         setProducts(prods)
-        // Shuffle immediately for the All tab
         setShuffledAllProducts(shuffleArray(prods))
       }
       if (count) setOrderCount(count)
     } catch (e) { console.error(e) }
     setLoading(false)
+  }
+
+  const fetchVaultStatus = async (userId: number) => {
+    try {
+      const res = await fetch(`/api/vault?user_id=${userId}`)
+      const data = await res.json()
+      setVaultUnlocked(data.unlocked === true)
+    } catch (e) { console.error(e) }
   }
 
   useEffect(() => {
@@ -101,7 +106,10 @@ export default function Storefront() {
           const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData }) })
           const data = await res.json()
           if (res.status === 403) { alert('Revoked.'); tg.close(); return }
-          if (data.success) setUser(data.user)
+          if (data.success) {
+            setUser(data.user)
+            fetchVaultStatus(data.user.id)
+          }
         } else {
           setUser({ id: 0, first_name: 'Browser', username: 'test_user', balance: 0 })
         }
@@ -115,7 +123,6 @@ export default function Storefront() {
   useEffect(() => {
     setActiveFilters({})
     setSearch('')
-    // Re-shuffle when switching TO "All"
     if (activeCategory === 'All') {
       setShuffledAllProducts(shuffleArray(products))
     }
@@ -137,7 +144,6 @@ export default function Storefront() {
     return values.sort()
   }
 
-  // Determine which base array to filter against
   const sourceList = activeCategory === 'All' ? shuffledAllProducts : products
 
   const filteredProducts = sourceList.filter(p => {
@@ -161,9 +167,10 @@ export default function Storefront() {
 
   const featuredProducts = products.slice(0, 3)
 
-  if (activeTab === 'orders') return <><OrdersPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
-  if (activeTab === 'wallet') return <><WalletPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
-  if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} setActiveTab={setActiveTab} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} /></>
+  if (activeTab === 'orders') return <><OrdersPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} /></>
+  if (activeTab === 'wallet') return <><WalletPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} /></>
+  if (activeTab === 'vault') return <><VaultPage user={user} onBack={() => setActiveTab('items')} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} /></>
+  if (activeTab === 'profile') return <><ProfilePage user={user} onBack={() => setActiveTab('items')} setActiveTab={setActiveTab} /><BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} /></>
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 font-sans text-gray-900 w-full max-w-full overflow-x-hidden relative">
@@ -226,11 +233,7 @@ export default function Storefront() {
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             {featuredProducts.map((p) => (
-              <button 
-                key={p.id}
-                onClick={() => { haptic.medium(); setDetailProduct(p); }}
-                className="bg-gray-900 rounded-2xl p-4 min-w-[200px] text-left shrink-0 border border-gray-800 shadow-lg"
-              >
+              <button key={p.id} onClick={() => { haptic.medium(); setDetailProduct(p); }} className="bg-gray-900 rounded-2xl p-4 min-w-[200px] text-left shrink-0 border border-gray-800 shadow-lg">
                 <div className="flex items-center gap-2 mb-2">
                   {p.image_url ? (
                     <Image src={p.image_url} alt={p.title} width={24} height={24} className="w-6 h-6 rounded-md object-cover" />
@@ -302,19 +305,11 @@ export default function Storefront() {
         <div className="px-4 pt-2 space-y-3 w-full max-w-full">
           <AnimatePresence>
             {filteredProducts.map((product, index) => (
-              <motion.div 
-                key={product.id} 
-                initial={{ opacity: 0, y: 20 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                exit={{ opacity: 0, scale: 0.95 }} 
-                transition={{ duration: 0.2, delay: index * 0.05 }} 
-                className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative"
-              >
+              <motion.div key={product.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2, delay: index * 0.05 }} className="bg-white rounded-3xl p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col w-full relative">
                 <div className="absolute top-4 right-4 flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100">
                   <span className="text-[10px]">🔥</span>
                   <span className="text-[10px] font-bold">1 left</span>
                 </div>
-
                 <div className="flex items-start gap-3 mb-3">
                   {product.image_url ? (
                     <Image src={product.image_url} alt={product.title} width={48} height={48} className="w-12 h-12 rounded-xl object-cover bg-gray-50 shadow-sm" />
@@ -326,7 +321,6 @@ export default function Storefront() {
                     <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">{product.category}</span>
                   </div>
                 </div>
-
                 <div className="my-3">
                   <p className="text-green-600 font-extrabold text-3xl tracking-tight leading-none">
                     {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
@@ -335,7 +329,6 @@ export default function Storefront() {
                     <p className="text-xs text-gray-500 mt-1 font-medium">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
                   )}
                 </div>
-
                 <div className="flex flex-wrap gap-1.5 mb-4">
                   {Object.entries(product.metadata)
                     .filter(([key]) => ['Level', 'Network', 'Bank'].includes(key))
@@ -343,7 +336,6 @@ export default function Storefront() {
                       <span key={key} className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md">{value}</span>
                     ))}
                 </div>
-
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
                   <div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Price</p>
@@ -378,14 +370,9 @@ export default function Storefront() {
         )}
       </AnimatePresence>
 
-      <ProductDetailSheet 
-        product={detailProduct} 
-        onClose={() => setDetailProduct(null)} 
-        onBuy={(p) => { setSelectedProduct(p) }} 
-      />
-
+      <ProductDetailSheet product={detailProduct} onClose={() => setDetailProduct(null)} onBuy={(p) => { setSelectedProduct(p) }} />
       {selectedProduct && <CheckoutModal product={selectedProduct} onClose={() => setSelectedProduct(null)} userId={user?.id || 0} />}
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} vaultUnlocked={vaultUnlocked} />
     </main>
   )
 }

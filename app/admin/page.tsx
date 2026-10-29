@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3, UserX, UserCheck, Wallet, Bitcoin } from 'lucide-react'
+import { ShieldAlert, Users, ShoppingBag, Plus, Lock, Trash2, Layers, CheckCircle, Pencil, Clock, Settings, BarChart3, UserX, UserCheck, Vault, Crown } from 'lucide-react'
 import { Country, State } from 'country-state-city'
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/dropzone'
 import { useSupabaseUpload } from '@/hooks/use-supabase-upload'
@@ -17,11 +17,11 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [usersList, setUsersList] = useState<any[]>([])
   const [topups, setTopups] = useState<any[]>([])
+  const [vaultPayments, setVaultPayments] = useState<any[]>([])
   const [settings, setSettings] = useState<any>(null)
-  const [cryptoMethods, setCryptoMethods] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'crypto' | 'settings'>('inventory')
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'vault' | 'settings'>('inventory')
   
   const [balanceInputs, setBalanceInputs] = useState<Record<number, string>>({})
   const [savedUserId, setSavedUserId] = useState<number | null>(null)
@@ -41,21 +41,12 @@ export default function AdminPage() {
   const [prodImage, setProdImage] = useState('')
   const [prodFields, setProdFields] = useState<Record<string, string>>({})
   const [prodDeliveryInfo, setProdDeliveryInfo] = useState('')
+  const [prodIsVault, setProdIsVault] = useState(false)
   const [selectedCountryCode, setSelectedCountryCode] = useState('')
 
   const [supportUrl, setSupportUrl] = useState('')
   const [proofsUrl, setProofsUrl] = useState('')
   const [guidesUrl, setGuidesUrl] = useState('')
-
-  // Crypto Form State
-  const [showCryptoForm, setShowCryptoForm] = useState(false)
-  const [cryptoEditId, setCryptoEditId] = useState<number | null>(null)
-  const [cryptoName, setCryptoName] = useState('')
-  const [cryptoSymbol, setCryptoSymbol] = useState('')
-  const [cryptoNetwork, setCryptoNetwork] = useState('')
-  const [cryptoWallet, setCryptoWallet] = useState('')
-  const [cryptoRecommended, setCryptoRecommended] = useState(false)
-  const [cryptoEmoji, setCryptoEmoji] = useState('₮')
 
   const countries = Country.getAllCountries()
   const availableStates = selectedCountryCode ? State.getStatesOfCountry(selectedCountryCode) : []
@@ -79,7 +70,6 @@ export default function AdminPage() {
     }
   }, [uploadProps.isSuccess, uploadProps.successes])
 
-  // AUTO-LOGIN
   useEffect(() => {
     const saved = localStorage.getItem('rw_admin_pw')
     if (saved) {
@@ -91,7 +81,7 @@ export default function AdminPage() {
             fetch(`/api/admin/orders?password=${saved}`).then(or => or.json()).then(od => setOrders(od.orders || []))
             fetch(`/api/admin/users?password=${saved}`).then(ur => ur.json()).then(ud => setUsersList(ud.users || []))
             fetch(`/api/topups?password=${saved}`).then(tr => tr.json()).then(td => setTopups(td.topups || []))
-            fetch('/api/admin/crypto').then(cr => cr.json()).then(cd => setCryptoMethods(cd.methods || []))
+            fetch(`/api/admin/vault?password=${saved}`).then(vr => vr.json()).then(vd => setVaultPayments(vd.payments || []))
             fetch('/api/admin/settings').then(sr => sr.json()).then(sd => {
               setSettings(sd); setSupportUrl(sd.support_url || ''); setProofsUrl(sd.proofs_url || ''); setGuidesUrl(sd.guides_url || '')
             })
@@ -124,9 +114,9 @@ export default function AdminPage() {
     if (res.ok) { const d = await res.json(); setTopups(d.topups || []) }
   }
 
-  const fetchCrypto = async () => {
-    const res = await fetch('/api/admin/crypto')
-    if (res.ok) { const d = await res.json(); setCryptoMethods(d.methods || []) }
+  const fetchVaultPayments = async () => {
+    const res = await fetch(`/api/admin/vault?password=${password}`)
+    if (res.ok) { const d = await res.json(); setVaultPayments(d.payments || []) }
   }
 
   const fetchSettings = async () => {
@@ -143,7 +133,7 @@ export default function AdminPage() {
     const ok = await fetchData()
     if (ok) {
       localStorage.setItem('rw_admin_pw', password)
-      await fetchOrders(); await fetchUsers(); await fetchTopups(); await fetchCrypto(); await fetchSettings()
+      await fetchOrders(); await fetchUsers(); await fetchTopups(); await fetchVaultPayments(); await fetchSettings()
     }
     setLoading(false)
   }
@@ -157,6 +147,13 @@ export default function AdminPage() {
   const handleToggleBan = async (telegram_id: number, is_blocked: boolean) => {
     if (confirm(`${is_blocked ? 'Unban' : 'Ban'} this user?`)) {
       await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, telegram_id, is_blocked: !is_blocked }) })
+      fetchUsers()
+    }
+  }
+
+  const handleToggleVip = async (telegram_id: number, is_vip: boolean) => {
+    if (confirm(`${is_vip ? 'Remove VIP from' : 'Make'} this user ${is_vip ? '' : 'VIP'}?`)) {
+      await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, telegram_id, is_vip: !is_vip }) })
       fetchUsers()
     }
   }
@@ -176,17 +173,17 @@ export default function AdminPage() {
   }
 
   const resetForm = () => {
-    setEditId(null); setProdTitle(''); setProdPrice(''); setProdImage(''); setProdFields({}); setProdDeliveryInfo(''); setSelectedCountryCode(''); setShowProdForm(false); uploadProps.setFiles([])
+    setEditId(null); setProdTitle(''); setProdPrice(''); setProdImage(''); setProdFields({}); setProdDeliveryInfo(''); setProdIsVault(false); setSelectedCountryCode(''); setShowProdForm(false); uploadProps.setFiles([])
   }
 
   const handleEditClick = (product: any) => {
-    setEditId(product.id); setProdTitle(product.title); setProdCategory(product.category); setProdPrice(product.price_usd.toString()); setProdImage(product.image_url || ''); setProdFields(product.metadata || {}); setProdDeliveryInfo(product.delivery_info || ''); setSelectedCountryCode(product.metadata?.Country || ''); setShowProdForm(true); window.scrollTo({ top: 0, behavior: 'smooth' })
+    setEditId(product.id); setProdTitle(product.title); setProdCategory(product.category); setProdPrice(product.price_usd.toString()); setProdImage(product.image_url || ''); setProdFields(product.metadata || {}); setProdDeliveryInfo(product.delivery_info || ''); setProdIsVault(product.is_vault_only || false); setSelectedCountryCode(product.metadata?.Country || ''); setShowProdForm(true); window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleSaveProduct = async () => {
     const finalMetadata = { ...prodFields }
     if (selectedCountryCode) finalMetadata['Country'] = selectedCountryCode
-    const payload = { password, title: prodTitle, category: prodCategory, price_usd: prodPrice, image_url: prodImage, metadata: finalMetadata, delivery_info: prodDeliveryInfo }
+    const payload = { password, title: prodTitle, category: prodCategory, price_usd: prodPrice, image_url: prodImage, metadata: finalMetadata, delivery_info: prodDeliveryInfo, is_vault_only: prodIsVault }
     if (editId) {
       await fetch('/api/admin/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: editId }) })
     } else {
@@ -224,31 +221,9 @@ export default function AdminPage() {
     fetchTopups(); fetchData()
   }
 
-  // --- CRYPTO HANDLERS ---
-  const resetCryptoForm = () => {
-    setCryptoEditId(null); setCryptoName(''); setCryptoSymbol(''); setCryptoNetwork(''); setCryptoWallet(''); setCryptoRecommended(false); setCryptoEmoji('₮'); setShowCryptoForm(false)
-  }
-
-  const handleEditCrypto = (m: any) => {
-    setCryptoEditId(m.id); setCryptoName(m.name); setCryptoSymbol(m.symbol); setCryptoNetwork(m.network || ''); setCryptoWallet(m.wallet_address); setCryptoRecommended(m.is_recommended); setCryptoEmoji(m.icon_emoji || '₮'); setShowCryptoForm(true); window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handleSaveCrypto = async () => {
-    if (!cryptoName || !cryptoWallet) { alert('Name and Wallet Address are required'); return }
-    const payload = { password, name: cryptoName, symbol: cryptoSymbol || cryptoName.toUpperCase(), network: cryptoNetwork, wallet_address: cryptoWallet, is_recommended: cryptoRecommended, icon_emoji: cryptoEmoji }
-    if (cryptoEditId) {
-      await fetch('/api/admin/crypto', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: cryptoEditId }) })
-    } else {
-      await fetch('/api/admin/crypto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    }
-    resetCryptoForm(); fetchCrypto()
-  }
-
-  const handleDeleteCrypto = async (id: number) => {
-    if (confirm('Delete this crypto method?')) {
-      await fetch(`/api/admin/crypto?password=${password}&id=${id}`, { method: 'DELETE' })
-      fetchCrypto()
-    }
+  const handleVaultAction = async (id: number, action: 'approve' | 'reject') => {
+    await fetch('/api/admin/vault', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, id, action }) })
+    fetchVaultPayments()
   }
 
   const selectedSchema = data?.schemas.find((s: any) => s.category === prodCategory)
@@ -304,8 +279,8 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('inventory')} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'inventory' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Inventory</button>
           <button onClick={() => { setActiveTab('orders'); fetchOrders() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'orders' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Orders ({orders.filter(o => o.status === 'pending').length})</button>
           <button onClick={() => { setActiveTab('topups'); fetchTopups() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'topups' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Top-Ups ({topups.filter(t => t.status === 'pending').length})</button>
+          <button onClick={() => { setActiveTab('vault'); fetchVaultPayments() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'vault' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Vault ({vaultPayments.filter((v: any) => v.status === 'pending').length})</button>
           <button onClick={() => { setActiveTab('users'); fetchUsers() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'users' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Users</button>
-          <button onClick={() => { setActiveTab('crypto'); fetchCrypto() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'crypto' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Crypto</button>
           <button onClick={() => { setActiveTab('settings'); fetchSettings() }} className={`px-3 py-2 rounded-lg text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'settings' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Settings</button>
         </div>
 
@@ -377,6 +352,12 @@ export default function AdminPage() {
                   <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Delivery Info</p>
                   <textarea value={prodDeliveryInfo} onChange={e => setProdDeliveryInfo(e.target.value)} placeholder="LOGIN: ... PASS: ... AN: ... RN: ..." className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" rows={3} />
                 </div>
+
+                <label className="flex items-center gap-2 p-2.5 bg-gray-700 rounded-lg cursor-pointer border border-gray-600">
+                  <input type="checkbox" checked={prodIsVault} onChange={e => setProdIsVault(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+                  <Vault size={14} className="text-orange-400" />
+                  <span className="text-xs font-medium text-gray-200">Vault Only (exclusive to VIP / trusted buyers)</span>
+                </label>
                 
                 <button onClick={handleSaveProduct} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">{editId ? 'Update Product' : 'Save Product'}</button>
               </div>
@@ -387,7 +368,10 @@ export default function AdminPage() {
               <div className="divide-y divide-gray-700 max-h-[500px] overflow-y-auto">
                 {data.products.map((p: any) => (
                   <div key={p.id} className={`p-3 flex items-center justify-between gap-2 ${p.is_sold ? 'bg-gray-900/50 opacity-60' : ''}`}>
-                    <div className="min-w-0 flex-1"><p className="font-semibold text-xs text-white truncate">{p.title}</p><p className="text-[10px] text-gray-400 truncate">{p.category} • ${p.price_usd}</p></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-xs text-white truncate">{p.title} {p.is_vault_only && <span className="text-[9px] bg-orange-900/50 text-orange-400 px-1 py-0.5 rounded ml-1">VAULT</span>}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{p.category} • ${p.price_usd}</p>
+                    </div>
                     <div className="flex gap-1 shrink-0">
                       <button onClick={() => handleToggleSold(p.id, p.is_sold)} className={`p-1.5 rounded transition-colors ${p.is_sold ? 'text-orange-400 bg-orange-900/30' : 'text-gray-400 bg-gray-700'}`}><CheckCircle size={14} /></button>
                       <button onClick={() => handleEditClick(p)} className="text-blue-400 p-1.5 bg-blue-900/30 rounded"><Pencil size={14} /></button>
@@ -481,6 +465,37 @@ export default function AdminPage() {
           </div>
         )}
 
+        {activeTab === 'vault' && (
+          <div className="space-y-3">
+            {vaultPayments.length === 0 ? (
+              <div className="text-center py-16 text-gray-400 bg-gray-800 rounded-2xl border border-gray-700 text-sm">No seller access requests.</div>
+            ) : (
+              vaultPayments.map((v: any) => (
+                <div key={v.id} className={`bg-gray-800 rounded-2xl border p-4 space-y-3 ${v.status === 'pending' ? 'border-yellow-700/50' : v.status === 'confirmed' ? 'border-green-700/50' : 'border-red-700/50'}`}>
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Crown size={12} className="text-orange-400" />
+                        <h3 className="font-bold text-white text-sm">Seller Access — ${v.amount}</h3>
+                      </div>
+                      <p className="text-[10px] text-gray-400 truncate">User: @{v.users?.username || 'unknown'} ({v.user_id})</p>
+                      <p className="text-[10px] text-gray-400 truncate">TXID: {v.tx_hash}</p>
+                      <p className="text-[10px] text-gray-400 truncate">Coin: {v.crypto_coin}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded shrink-0 ${v.status === 'pending' ? 'bg-yellow-900/50 text-yellow-400' : v.status === 'confirmed' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>{v.status.toUpperCase()}</span>
+                  </div>
+                  {v.status === 'pending' && (
+                    <div className="flex gap-2 pt-2 border-t border-gray-700">
+                      <button onClick={() => handleVaultAction(v.id, 'approve')} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">Approve</button>
+                      <button onClick={() => handleVaultAction(v.id, 'reject')} className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-red-700 transition-colors">Reject</button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {activeTab === 'users' && (
           <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
             <div className="p-3 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
@@ -493,12 +508,17 @@ export default function AdminPage() {
                   <div className="flex items-center gap-2 w-full">
                     <div className="w-9 h-9 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 font-bold shrink-0 text-sm">{u.first_name ? u.first_name[0].toUpperCase() : '?'}</div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-xs text-white truncate">{u.first_name || 'Unknown'} {u.username && <span className="text-gray-400">@{u.username}</span>}</p>
+                      <p className="font-semibold text-xs text-white truncate">{u.first_name || 'Unknown'} {u.username && <span className="text-gray-400">@{u.username}</span>} {u.is_vip && <span className="text-[9px] bg-orange-900/50 text-orange-400 px-1 py-0.5 rounded ml-1">VIP</span>} {u.vault_access && <span className="text-[9px] bg-purple-900/50 text-purple-400 px-1 py-0.5 rounded ml-1">SELLER</span>}</p>
                       <p className="text-[10px] text-gray-400 truncate">ID: {u.telegram_id} • <span className="text-orange-400">{u.source || 'organic'}</span></p>
                     </div>
-                    <button onClick={() => handleToggleBan(u.telegram_id, u.is_blocked)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold shrink-0 ${u.is_blocked ? 'bg-green-900/30 text-green-400 border border-green-700' : 'bg-red-900/30 text-red-400 border border-red-700'}`}>
-                      {u.is_blocked ? <><UserCheck size={12} /> Unban</> : <><UserX size={12} /> Ban</>}
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => handleToggleVip(u.telegram_id, u.is_vip)} className={`px-2 py-1.5 rounded-lg text-[10px] font-bold ${u.is_vip ? 'bg-orange-500 text-white' : 'bg-gray-700 text-gray-300'}`}>
+                        {u.is_vip ? 'VIP' : 'Make VIP'}
+                      </button>
+                      <button onClick={() => handleToggleBan(u.telegram_id, u.is_blocked)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${u.is_blocked ? 'bg-green-900/30 text-green-400 border border-green-700' : 'bg-red-900/30 text-red-400 border border-red-700'}`}>
+                        {u.is_blocked ? <><UserCheck size={12} /> Unban</> : <><UserX size={12} /> Ban</>}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 bg-gray-900 p-1 rounded-lg border border-gray-700 w-full">
                     <span className="text-xs font-medium text-gray-400 pl-1">$</span>
@@ -507,59 +527,6 @@ export default function AdminPage() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'crypto' && (
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <button onClick={() => { resetCryptoForm(); setShowCryptoForm(!showCryptoForm); }} className="flex-1 flex items-center justify-center gap-2 text-xs md:text-sm font-semibold bg-orange-500 text-white px-3 py-2.5 rounded-lg hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><Bitcoin size={14} /> Add Crypto</button>
-            </div>
-
-            {showCryptoForm && (
-              <div className={`bg-gray-800 p-4 rounded-2xl border-2 ${cryptoEditId ? 'border-orange-500' : 'border-gray-700'} space-y-3`}>
-                <div className="flex justify-between items-center">
-                  <h2 className="font-bold text-white">{cryptoEditId ? 'Edit Crypto' : 'New Crypto Method'}</h2>
-                  {cryptoEditId && <button onClick={resetCryptoForm} className="text-xs text-red-400 font-semibold">Cancel</button>}
-                </div>
-                <input placeholder="Name (e.g. USDT)" value={cryptoName} onChange={e => setCryptoName(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                <input placeholder="Symbol (e.g. USDT)" value={cryptoSymbol} onChange={e => setCryptoSymbol(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                <input placeholder="Network (e.g. TRC20)" value={cryptoNetwork} onChange={e => setCryptoNetwork(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                <input placeholder="Wallet Address" value={cryptoWallet} onChange={e => setCryptoWallet(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                <input placeholder="Emoji Icon (e.g. ₮ or ₿)" value={cryptoEmoji} onChange={e => setCryptoEmoji(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                <label className="flex items-center gap-2 p-2.5 bg-gray-700 rounded-lg cursor-pointer border border-gray-600">
-                  <input type="checkbox" checked={cryptoRecommended} onChange={e => setCryptoRecommended(e.target.checked)} className="w-4 h-4 accent-orange-500" />
-                  <span className="text-xs font-medium text-gray-200">Set as Recommended (Fastest / Lowest Fee)</span>
-                </label>
-                <button onClick={handleSaveCrypto} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">{cryptoEditId ? 'Update Crypto' : 'Save Crypto'}</button>
-              </div>
-            )}
-
-            <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-              <div className="p-3 border-b border-gray-700 bg-gray-800/50"><h2 className="font-bold text-white text-sm">Active Crypto Methods ({cryptoMethods.length})</h2></div>
-              <div className="divide-y divide-gray-700">
-                {cryptoMethods.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400 text-sm">No crypto methods yet. Add one above.</div>
-                ) : (
-                  cryptoMethods.map((m: any) => (
-                    <div key={m.id} className="p-3 flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{m.icon_emoji}</span>
-                          <p className="font-semibold text-xs text-white truncate">{m.name} {m.network && <span className="text-gray-400">({m.network})</span>}</p>
-                          {m.is_recommended && <span className="text-[9px] font-bold bg-orange-900/50 text-orange-400 px-1.5 py-0.5 rounded border border-orange-700">REC</span>}
-                        </div>
-                        <p className="text-[10px] text-gray-400 font-mono truncate">{m.wallet_address}</p>
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        <button onClick={() => handleEditCrypto(m)} className="text-blue-400 p-1.5 bg-blue-900/30 rounded"><Pencil size={14} /></button>
-                        <button onClick={() => handleDeleteCrypto(m.id)} className="text-red-400 p-1.5 bg-red-900/30 rounded"><Trash2 size={14} /></button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
           </div>
         )}

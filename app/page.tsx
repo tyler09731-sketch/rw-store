@@ -310,7 +310,7 @@ export default function Storefront() {
                         ) : col === 'Exp' ? (
                           <span className="block">{formatExp(p.metadata[col])}</span>
                         ) : col === 'Balance' ? (
-                          <span className="block text-green-600 font-bold break-words line-clamp-2">{formatBalance(p.metadata[col])}</span>
+                          <span className="block text-green-600 font-bold break-words">{formatBalance(p.metadata[col])}</span>
                         ) : col === 'Address' || col === 'Email' ? (
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${p.metadata[col] === 'Yes' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>{p.metadata[col] || '-'}</span>
                         ) : (
@@ -366,17 +366,17 @@ export default function Storefront() {
                         <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500 shadow-sm"><Package size={22} /></div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-base text-gray-900 leading-tight truncate">{product.title}</h3>
+                        <h3 className="font-bold text-base text-gray-900 leading-tight break-words">{product.title}</h3>
                         <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-md">{product.category}</span>
                       </div>
                     </div>
 
                     <div className="my-3">
-                      <p className="text-green-600 font-extrabold text-2xl tracking-tight leading-tight break-words line-clamp-2">
+                      <p className="text-green-600 font-extrabold text-2xl tracking-tight leading-tight break-words">
                         {product.metadata.Balance ? formatBalance(product.metadata.Balance) : 'Digital Item'}
                       </p>
                       {product.metadata.BIN && (
-                        <p className="text-xs text-gray-500 mt-1 font-medium truncate">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
+                        <p className="text-xs text-gray-500 mt-1 font-medium break-words">BIN: {product.metadata.BIN} • Exp: {formatExp(product.metadata.Exp)}</p>
                       )}
                     </div>
 

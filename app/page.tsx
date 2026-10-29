@@ -3,6 +3,7 @@
 import { useEffect, useState, useDeferredValue, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { matchSorter } from 'match-sorter'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { Search, RotateCw, Package, ChevronRight, X, SlidersHorizontal, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
@@ -75,6 +76,7 @@ export default function Storefront() {
   const [shuffledAllProducts, setShuffledAllProducts] = useState<Product[]>([])
 
   const parentRef = useRef<HTMLDivElement>(null)
+  const lastNotifiedOrderId = useRef<number | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -83,6 +85,25 @@ export default function Storefront() {
       if (prods) {
         setProducts(prods)
         setShuffledAllProducts(shuffleArray(prods))
+      }
+
+      if (user?.id) {
+        const { data: latestOrder } = await supabase
+          .from('orders')
+          .select('id, order_ref, products(title)')
+          .eq('user_id', user.id)
+          .eq('status', 'confirmed')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (latestOrder && latestOrder.id !== lastNotifiedOrderId.current) {
+          toast.success(`Order #${latestOrder.order_ref} Delivered!`, {
+            description: `${(latestOrder.products as any)?.[0]?.title || 'Your item'} is ready.`,
+            duration: 5000,
+          })
+          lastNotifiedOrderId.current = latestOrder.id
+        }
       }
     } catch (e) { console.error(e) }
     setLoading(false)

@@ -386,9 +386,9 @@ export default function AdminPage() {
                         <SelectTrigger className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
                           <SelectValue placeholder="Select Country" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
                           {countries.map((c: any) => (
-                            <SelectItem key={c.isoCode} value={c.isoCode}>{c.name}</SelectItem>
+                            <SelectItem key={c.isoCode} value={c.isoCode} className="text-white focus:bg-gray-700 focus:text-white">{c.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -400,9 +400,9 @@ export default function AdminPage() {
                         <SelectTrigger className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
                           <SelectValue placeholder="Select State" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
                           {availableStates.map((s: any) => (
-                            <SelectItem key={s.isoCode} value={s.isoCode}>{s.name} ({s.isoCode})</SelectItem>
+                            <SelectItem key={s.isoCode} value={s.isoCode} className="text-white focus:bg-gray-700 focus:text-white">{s.name} ({s.isoCode})</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -414,9 +414,9 @@ export default function AdminPage() {
                         <SelectTrigger className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
                           <SelectValue placeholder="Select Level" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
                           {CARD_LEVELS.map(lvl => (
-                            <SelectItem key={lvl} value={lvl}>{lvl}</SelectItem>
+                            <SelectItem key={lvl} value={lvl} className="text-white focus:bg-gray-700 focus:text-white">{lvl}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -428,9 +428,9 @@ export default function AdminPage() {
                         <SelectTrigger className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
                           <SelectValue placeholder="Select Network" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
                           {CARD_NETWORKS.map(net => (
-                            <SelectItem key={net} value={net}>{net}</SelectItem>
+                            <SelectItem key={net} value={net} className="text-white focus:bg-gray-700 focus:text-white">{net}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

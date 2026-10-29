@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Vault, CheckCircle2, Users, Crown, Tag, Megaphone, DollarSign, Award, Clock, ShoppingBag, Hourglass } from 'lucide-react'
+import { ArrowLeft, Vault, CheckCircle2, Users, Crown, Tag, Megaphone, DollarSign, Award, Hourglass, ShoppingBag } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { haptic } from '@/lib/haptics'
 import CryptoSelector from '@/components/CryptoSelector'
@@ -10,7 +10,7 @@ export default function VaultPage({ user, onBack }: { user: any, onBack: () => v
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showPayment, setShowPayment] = useState(false)
-  const [paymentStep, setPaymentStep] = useState<'select' | 'pay' | 'hash' | 'pending' | 'already_pending'>('select')
+  const [paymentStep, setPaymentStep] = useState<'select' | 'pay' | 'hash' | 'pending'>('select')
   const [selectedMethod, setSelectedMethod] = useState<any>(null)
   const [txHash, setTxHash] = useState('')
   const [copied, setCopied] = useState(false)
@@ -18,7 +18,7 @@ export default function VaultPage({ user, onBack }: { user: any, onBack: () => v
   const [timeLeft, setTimeLeft] = useState(900)
 
   const fetchVault = () => {
-    if (!user?.id) return
+    if (!user?.id) { setLoading(false); return }
     fetch(`/api/vault?user_id=${user.id}`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
@@ -39,10 +39,20 @@ export default function VaultPage({ user, onBack }: { user: any, onBack: () => v
   }
 
   const handleCopy = () => {
+    if (!selectedMethod?.wallet_address) return
     navigator.clipboard.writeText(selectedMethod.wallet_address)
     haptic.success()
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleSelectMethod = (m: any) => {
+    if (!m || !m.wallet_address) {
+      alert('This payment method is not configured. Contact support.')
+      return
+    }
+    setSelectedMethod(m)
+    setPaymentStep('pay')
   }
 
   const handlePayAccess = async () => {
@@ -89,7 +99,6 @@ export default function VaultPage({ user, onBack }: { user: any, onBack: () => v
 
       {!data?.unlocked ? (
         <div className="px-4 pt-6 space-y-5">
-          
           {data?.hasPendingPayment && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -151,9 +160,7 @@ export default function VaultPage({ user, onBack }: { user: any, onBack: () => v
               <span className="text-sm text-white/60 mb-1.5">one-time</span>
             </div>
             {data?.hasPendingPayment ? (
-              <div className="w-full bg-white/20 text-white py-3.5 rounded-xl font-bold text-center">
-                Awaiting Admin Approval
-              </div>
+              <div className="w-full bg-white/20 text-white py-3.5 rounded-xl font-bold text-center">Awaiting Admin Approval</div>
             ) : (
               <button onClick={() => { haptic.medium(); setShowPayment(true) }} className="w-full bg-white text-orange-600 py-3.5 rounded-xl font-bold active:scale-95 transition-transform shadow-lg">
                 Unlock Seller Access
@@ -219,9 +226,9 @@ export default function VaultPage({ user, onBack }: { user: any, onBack: () => v
                 <button onClick={() => setShowPayment(false)} className="p-2 bg-gray-100 rounded-full text-gray-500">✕</button>
               </div>
 
-              {paymentStep === 'select' && <CryptoSelector selectedId={selectedMethod?.id || null} onSelect={(m) => { setSelectedMethod(m); setPaymentStep('pay') }} />}
+              {paymentStep === 'select' && <CryptoSelector selectedId={selectedMethod?.id || null} onSelect={handleSelectMethod} />}
 
-              {paymentStep === 'pay' && selectedMethod && (
+              {paymentStep === 'pay' && selectedMethod?.wallet_address && (
                 <div className="space-y-4">
                   <div className="bg-orange-50 text-orange-600 p-3 rounded-xl flex justify-between border border-orange-100">
                     <span className="text-sm font-medium">Rate locked</span>
@@ -238,6 +245,13 @@ export default function VaultPage({ user, onBack }: { user: any, onBack: () => v
                     <button onClick={handleCopy} className="mt-3 w-full flex items-center justify-center gap-2 bg-white border py-2.5 rounded-lg font-semibold text-sm">{copied ? 'Copied!' : 'Copy Address'}</button>
                   </div>
                   <button onClick={() => setPaymentStep('hash')} className="w-full bg-orange-500 text-white py-3.5 rounded-xl font-bold">I've Sent Payment</button>
+                </div>
+              )}
+
+              {paymentStep === 'pay' && !selectedMethod?.wallet_address && (
+                <div className="text-center py-8">
+                  <p className="text-sm text-red-500">This payment method is missing a wallet address. Please go back and select another.</p>
+                  <button onClick={() => setPaymentStep('select')} className="mt-4 text-orange-500 font-bold text-sm">Go Back</button>
                 </div>
               )}
 

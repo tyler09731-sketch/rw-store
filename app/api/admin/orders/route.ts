@@ -17,9 +17,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // FIXED: Include metadata so admin sees BIN, Exp, etc.
   const { data: orders, error } = await supabaseAdmin
     .from('orders')
-    .select('*, products(title, category, delivery_info), users(telegram_id, first_name, username)')
+    .select('*, products(title, category, delivery_info, metadata), users(telegram_id, first_name, username)')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

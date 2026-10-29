@@ -73,13 +73,11 @@ export default function AdminPage() {
     const saved = localStorage.getItem('rw_admin_pw')
     if (saved) {
       setPassword(saved)
-      // Test the saved password
       fetch(`/api/admin/products?password=${saved}`).then(r => {
         if (r.ok) {
           r.json().then(d => {
             setData(d)
             setIsAuthenticated(true)
-            // Fetch everything else
             fetch(`/api/admin/orders?password=${saved}`).then(or => or.json()).then(od => setOrders(od.orders || []))
             fetch(`/api/admin/users?password=${saved}`).then(ur => ur.json()).then(ud => setUsersList(ud.users || []))
             fetch(`/api/topups?password=${saved}`).then(tr => tr.json()).then(td => setTopups(td.topups || []))
@@ -380,8 +378,12 @@ export default function AdminPage() {
             ) : (
               orders.map((order) => {
                 const productInfo = order.products?.delivery_info || ''
+                const metadata = order.products?.metadata || {}
+                const metaEntries = Object.entries(metadata).filter(([k, v]) => v && v !== '-' && v !== 'N/A')
+                
                 return (
                   <div key={order.id} className={`bg-gray-800 rounded-2xl border p-4 space-y-3 ${order.status === 'pending' ? 'border-yellow-700/50 bg-yellow-900/10' : 'border-green-700/50 bg-green-900/10'}`}>
+                    
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <h3 className="font-bold text-white text-sm truncate">{order.products?.title || 'Unknown'}</h3>
@@ -395,19 +397,51 @@ export default function AdminPage() {
                       )}
                     </div>
 
+                    {metaEntries.length > 0 && (
+                      <div className="bg-gray-900/50 rounded-lg p-2.5 border border-gray-700">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5">Product Info</p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                          {metaEntries.map(([key, value]: [string, any]) => (
+                            <div key={key} className="flex justify-between text-[11px]">
+                              <span className="text-gray-500">{key}:</span>
+                              <span className="text-white font-medium truncate ml-1">{String(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-2 text-xs text-gray-300">
-                      <span>Price: <strong className="text-white">${order.price_usd || '0'}</strong></span>
+                      <span>Price: <strong className="text-white">${order.price_usd || order.products?.price_usd || '0'}</strong></span>
                       <span>Coin: <strong className="text-white">{order.crypto_coin}</strong></span>
                       <span>Cat: <strong className="text-blue-400">{order.products?.category || 'N/A'}</strong></span>
                     </div>
 
                     {order.status === 'pending' ? (
                       <div className="pt-2 border-t border-gray-700 space-y-2">
-                        <textarea id={`delivery-${order.id}`} defaultValue={productInfo} placeholder="LOGIN: ... PASS: ..." className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" rows={3} />
-                        <button onClick={() => { const el = document.getElementById(`delivery-${order.id}`) as HTMLTextAreaElement; handleConfirmOrder(order.id, el.value) }} className="w-full bg-green-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">Confirm & Deliver</button>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase">Delivery Info {productInfo && <span className="text-green-400">(Auto-filled)</span>}</p>
+                        <textarea 
+                          id={`delivery-${order.id}`} 
+                          defaultValue={productInfo} 
+                          placeholder="LOGIN: ... PASS: ... AN: ... RN: ..." 
+                          className="w-full bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-orange-500" 
+                          rows={4} 
+                        />
+                        <button 
+                          onClick={() => { 
+                            const el = document.getElementById(`delivery-${order.id}`) as HTMLTextAreaElement
+                            handleConfirmOrder(order.id, el.value) 
+                          }} 
+                          className="w-full bg-green-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors"
+                        >
+                          Confirm & Deliver
+                        </button>
                       </div>
                     ) : (
-                      <div className="pt-2 border-t border-gray-700 bg-gray-900/50 p-2.5 rounded-lg"><p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Delivered</p><pre className="text-[11px] font-mono text-green-400 whitespace-pre-wrap">{order.delivery_info}</pre></div>
+                      <div className="pt-2 border-t border-gray-700 bg-gray-900/50 p-2.5 rounded-lg">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Delivered</p>
+                        <pre className="text-[11px] font-mono text-green-400 whitespace-pre-wrap">{order.delivery_info}</pre>
+                      </div>
                     )}
                   </div>
                 )

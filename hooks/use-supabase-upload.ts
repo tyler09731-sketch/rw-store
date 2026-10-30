@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  useDropzone,
-  type FileError,
-  type FileRejection,
-} from 'react-dropzone'
+import { useDropzone, type FileError, type FileRejection } from 'react-dropzone'
 
 import { createClient } from '@/lib/supabase/client'
 
@@ -15,12 +11,6 @@ interface FileWithPreview extends File {
   uploadId: string
 }
 
-interface UploadedFile {
-  uploadId: string
-  name: string
-  path: string
-}
-
 type UseSupabaseUploadOptions = {
   bucketName: string
   path?: string
@@ -30,8 +20,6 @@ type UseSupabaseUploadOptions = {
   cacheControl?: number
   upsert?: boolean
 }
-
-type UseSupabaseUploadReturn = ReturnType<typeof useSupabaseUpload>
 
 const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
   const {
@@ -46,82 +34,66 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
 
   const [files, setFiles] = useState<FileWithPreview[]>([])
   const [loading, setLoading] = useState(false)
-  const [errors, setErrors] = useState<
-    { name: string; message: string }[]
-  >([])
+  const [errors, setErrors] = useState<{ name: string; message: string }[]>([])
   const [successes, setSuccesses] = useState<string[]>([])
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
-  const uploadInProgress = useRef(false)
-  const attemptedUploads = useRef(new Set<string>())
-  const uploadedIds = useRef(new Set<string>())
-  const filesRef = useRef<FileWithPreview[]>([])
+  // Track uploads by unique ID, never by original filename.
+  const attemptedUploads = useRef<Set<string>>(new Set())
 
-  const updateFiles = useCallback((newFiles: FileWithPreview[]) => {
-    filesRef.current = newFiles
-    setFiles(newFiles)
-  }, [])
+  // Prevent old upload responses from affecting a newer selection.
+  const uploadGeneration = useRef(0)
 
   const isSuccess = useMemo(() => {
-    return (
-      files.length > 0 &&
-      files.every((file) => uploadedFiles.some(
-        (uploaded) => uploaded.uploadId === file.uploadId
-      )) &&
-      errors.length === 0
-    )
-  }, [files, uploadedFiles, errors])
+    if (files.length === 0) return false
+    if (errors.length > 0) return false
+    if (files.some((file) => file.errors.length > 0)) return false
 
-  // Create file objects with previews and unique IDs.
-  const createFile = useCallback(
-    (file: File, fileErrors: readonly FileError[] = []) => {
-      return Object.assign(file, {
-        preview: URL.createObjectURL(file),
-        errors: fileErrors,
-        uploadId: crypto.randomUUID(),
-      }) as FileWithPreview
-    },
-    []
-  )
+    return successes.length === files.length
+  }, [files, errors, successes])
 
-  // Handle file selection.
+  // Handle selected files.
   const onDrop = useCallback(
     (acceptedFiles: File[], fileRejections: FileRejection[]) => {
-      const validFiles = acceptedFiles.map((file) => createFile(file))
+      // Invalidate any previous upload session.
+      uploadGeneration.current += 1
 
-      const invalidFiles = fileRejections.map(({ file, errors }) =>
-        createFile(file, errors)
-      )
+      const validFiles = acceptedFiles.map((file) => {
+        const fileWithPreview = file as FileWithPreview
 
-      // Replace the previous selection for single-file uploads.
+        fileWithPreview.preview = URL.createObjectURL(file)
+        fileWithPreview.errors = []
+        fileWithPreview.uploadId = crypto.randomUUID()
+
+        return fileWithPreview
+      })
+
+      const invalidFiles = fileRejections.map(({ file, errors }) => {
+        const fileWithPreview = file as FileWithPreview
+
+        fileWithPreview.preview = URL.createObjectURL(file)
+        fileWithPreview.errors = errors
+        fileWithPreview.uploadId = crypto.randomUUID()
+
+        return fileWithPreview
+      })
+
+      // Single-file uploads replace the previous selection entirely.
       const newFiles =
         maxFiles === 1
           ? [...validFiles, ...invalidFiles]
-          : [...filesRef.current, ...validFiles, ...invalidFiles]
+          : [...files, ...validFiles, ...invalidFiles]
 
-      // Clean up previews from files being replaced.
       if (maxFiles === 1) {
-        filesRef.current.forEach((file) => {
-          if (file.preview) {
-            URL.revokeObjectURL(file.preview)
-          }
-        })
+        attemptedUploads.current.clear()
       }
 
-      updateFiles(newFiles)
-
-      // Reset upload tracking for the new selection.
-      attemptedUploads.current.clear()
-      uploadedIds.current.clear()
-
-      setErrors([])
       setSuccesses([])
-      setUploadedFiles([])
+      setErrors([])
+      setFiles(newFiles)
     },
-    [createFile, maxFiles, updateFiles]
+    [files, maxFiles]
   )
 
-  // Dropzone configuration.
   const dropzoneProps = useDropzone({
     onDrop,
     noClick: true,
@@ -134,174 +106,165 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
     multiple: maxFiles !== 1,
   })
 
-  // Upload files to Supabase.
-  const uploadPending = useCallback(
-    async (retryFailed = false) => {
-      if (uploadInProgress.current) return
+  // Upload selected files to Supabase.
+  const onUpload = useCallback(async () => {
+    const currentGeneration = uploadGeneration.current
 
-      const pendingFiles = files.filter(
-        (file) =>
-          file.errors.length === 0 &&
-          !uploadedIds.current.has(file.uploadId) &&
-          (
-            retryFailed ||
-            !attemptedUploads.current.has(file.uploadId)
-          )
-      )
+    // Only upload files that haven't already been attempted.
+    const filesToUpload = files.filter(
+      (file) =>
+        file.errors.length === 0 &&
+        !attemptedUploads.current.has(file.uploadId)
+    )
 
-      if (pendingFiles.length === 0) return
+    if (filesToUpload.length === 0) return
 
-      uploadInProgress.current = true
-      setLoading(true)
+    // Mark these files immediately to prevent duplicate uploads.
+    filesToUpload.forEach((file) => {
+      attemptedUploads.current.add(file.uploadId)
+    })
 
-      pendingFiles.forEach((file) => {
-        attemptedUploads.current.add(file.uploadId)
-      })
+    setLoading(true)
 
-      try {
-        const responses = await Promise.all(
-          pendingFiles.map(async (file) => {
-            // Unique filenames prevent stale image caching.
-            const extension = file.name.includes('.')
-              ? file.name.split('.').pop()
-              : 'bin'
+    const responses = await Promise.all(
+      filesToUpload.map(async (file) => {
+        try {
+          // Generate a unique storage filename.
+          const originalExtension = file.name.split('.').pop() || 'bin'
 
-            const uniqueName = `${crypto.randomUUID()}.${extension}`
+          const extension = /^[a-z0-9]+$/i.test(originalExtension)
+            ? originalExtension.toLowerCase()
+            : 'bin'
 
-            const filePath = path
-              ? `${path}/${uniqueName}`
-              : uniqueName
+          const uniqueFileName = `${crypto.randomUUID()}.${extension}`
 
-            const { data, error } = await supabase.storage
-              .from(bucketName)
-              .upload(filePath, file, {
-                cacheControl: cacheControl.toString(),
-                upsert,
-                contentType: file.type || undefined,
-              })
+          const storagePath = path
+            ? `${path}/${uniqueFileName}`
+            : uniqueFileName
 
-            if (error) {
-              return {
-                uploadId: file.uploadId,
-                name: file.name,
-                path: '',
-                message: error.message,
-              }
-            }
+          const { error } = await supabase.storage
+            .from(bucketName)
+            .upload(storagePath, file, {
+              cacheControl: cacheControl.toString(),
+              upsert: false,
+              contentType: file.type || 'application/octet-stream',
+            })
 
+          if (error) {
             return {
-              uploadId: file.uploadId,
+              id: file.uploadId,
               name: file.name,
-              path: data.path,
-              message: undefined,
+              message: error.message,
+              storageName: null,
             }
-          })
-        )
+          }
 
-        const failed = responses.filter(
-          (response) => response.message !== undefined
-        )
-
-        const successful = responses.filter(
-          (response) => response.message === undefined
-        )
-
-        // Track successful uploads.
-        successful.forEach((response) => {
-          uploadedIds.current.add(response.uploadId)
-        })
-
-        setErrors(
-          failed.map((response) => ({
-            name: response.name,
-            message: response.message!,
-          }))
-        )
-
-        setSuccesses((previous) => [
-          ...new Set([
-            ...previous,
-            ...successful.map((response) => response.name),
-          ]),
-        ])
-
-        setUploadedFiles((previous) => [
-          ...previous.filter(
-            (uploaded) =>
-              !successful.some(
-                (response) => response.uploadId === uploaded.uploadId
-              )
-          ),
-          ...successful.map((response) => ({
-            uploadId: response.uploadId,
-            name: response.name,
-            path: response.path,
-          })),
-        ])
-      } catch (error) {
-        setErrors([
-          {
-            name: 'Upload',
+          return {
+            id: file.uploadId,
+            name: file.name,
+            message: undefined,
+            storageName: uniqueFileName,
+          }
+        } catch (error) {
+          return {
+            id: file.uploadId,
+            name: file.name,
             message:
               error instanceof Error
                 ? error.message
-                : 'An unexpected upload error occurred.',
-          },
-        ])
-      } finally {
-        uploadInProgress.current = false
-        setLoading(false)
-      }
-    },
-    [files, path, bucketName, cacheControl, upsert]
-  )
+                : 'Unknown upload error',
+            storageName: null,
+          }
+        }
+      })
+    )
+
+    // Ignore responses from an older product/image selection.
+    if (currentGeneration !== uploadGeneration.current) return
+
+    const responseErrors = responses
+      .filter((response) => response.message !== undefined)
+      .map((response) => ({
+        name: response.name,
+        message: response.message as string,
+      }))
+
+    const responseSuccesses = responses
+      .filter((response) => response.storageName !== null)
+      .map((response) => response.storageName as string)
+
+    setErrors((previous) => [...previous, ...responseErrors])
+
+    setSuccesses((previous) => [
+      ...previous,
+      ...responseSuccesses,
+    ])
+
+    setLoading(false)
+  }, [files, path, bucketName, cacheControl])
 
   // Automatically upload newly selected files.
   useEffect(() => {
     const hasNewFiles = files.some(
       (file) =>
         file.errors.length === 0 &&
-        !uploadedIds.current.has(file.uploadId) &&
         !attemptedUploads.current.has(file.uploadId)
     )
 
-    if (hasNewFiles && !loading && !uploadInProgress.current) {
-      uploadPending()
+    if (hasNewFiles) {
+      onUpload()
     }
-  }, [files, loading, uploadPending])
+  }, [files, onUpload])
 
-  // Manually retry failed uploads.
-  const onUpload = useCallback(async () => {
-    await uploadPending(true)
-  }, [uploadPending])
+  // Reset upload state when files are cleared.
+  useEffect(() => {
+    if (files.length === 0) {
+      uploadGeneration.current += 1
+      setErrors([])
+      setSuccesses([])
+      setLoading(false)
+      attemptedUploads.current.clear()
+    }
+  }, [files.length])
 
-  // Release preview URLs when the component unmounts.
+  // Remove unnecessary "too many files" errors when selection is valid.
+  useEffect(() => {
+    if (files.length <= maxFiles) {
+      let changed = false
+
+      const newFiles = files.map((file) => {
+        if (file.errors.some((error) => error.code === 'too-many-files')) {
+          file.errors = file.errors.filter(
+            (error) => error.code !== 'too-many-files'
+          )
+
+          changed = true
+        }
+
+        return file
+      })
+
+      if (changed) {
+        setFiles(newFiles)
+      }
+    }
+  }, [files, maxFiles])
+
+  // Clean up local image previews.
   useEffect(() => {
     return () => {
-      filesRef.current.forEach((file) => {
+      files.forEach((file) => {
         if (file.preview) {
           URL.revokeObjectURL(file.preview)
         }
       })
     }
-  }, [])
-
-  // Handle empty file selection.
-  useEffect(() => {
-    if (files.length === 0) {
-      setErrors([])
-      setSuccesses([])
-      setUploadedFiles([])
-      attemptedUploads.current.clear()
-      uploadedIds.current.clear()
-    }
-  }, [files.length])
+  }, [files])
 
   return {
     files,
-    setFiles: updateFiles,
+    setFiles,
     successes,
-    uploadedFiles,
     isSuccess,
     loading,
     errors,
@@ -313,6 +276,8 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
     ...dropzoneProps,
   }
 }
+
+type UseSupabaseUploadReturn = ReturnType<typeof useSupabaseUpload>
 
 export {
   useSupabaseUpload,

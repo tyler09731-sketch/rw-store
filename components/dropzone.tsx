@@ -1,5 +1,3 @@
-'use client'
-
 import { CheckCircle, File, Loader2, Upload, X } from 'lucide-react'
 import { createContext, useCallback, useContext, type PropsWithChildren } from 'react'
 
@@ -20,7 +18,10 @@ export const formatBytes = (
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
 }
 
-type DropzoneContextType = Omit<UseSupabaseUploadReturn, 'getRootProps' | 'getInputProps' | 'open'>
+type DropzoneContextType = Omit<
+  UseSupabaseUploadReturn,
+  'getRootProps' | 'getInputProps' | 'open' | 'reset'
+>
 const DropzoneContext = createContext<DropzoneContextType | undefined>(undefined)
 
 type DropzoneProps = UseSupabaseUploadReturn & {
@@ -73,7 +74,6 @@ const DropzoneContent = ({ className }: { className?: string }) => {
     errors,
     maxFileSize,
     maxFiles,
-    isSuccess,
   } = useDropzoneContext()
 
   const exceedMaxFiles = files.length > maxFiles
@@ -84,17 +84,6 @@ const DropzoneContent = ({ className }: { className?: string }) => {
     },
     [files, setFiles]
   )
-
-  if (isSuccess) {
-    return (
-      <div className={cn('flex flex-row items-center gap-x-2 justify-center', className)}>
-        <CheckCircle size={16} className="text-primary" />
-        <p className="text-primary text-sm">
-          Successfully uploaded {files.length} file{files.length > 1 ? 's' : ''}
-        </p>
-      </div>
-    )
-  }
 
   return (
     <div className={cn('flex flex-col', className)}>
@@ -142,6 +131,10 @@ const DropzoneContent = ({ className }: { className?: string }) => {
               )}
             </div>
 
+            {isSuccessfullyUploaded && (
+              <CheckCircle size={16} className="shrink-0 text-primary" />
+            )}
+
             {!loading && !isSuccessfullyUploaded && (
               <Button
                 size="icon"
@@ -161,7 +154,7 @@ const DropzoneContent = ({ className }: { className?: string }) => {
           {files.length - maxFiles > 1 ? 's' : ''}.
         </p>
       )}
-      {files.length > 0 && !exceedMaxFiles && (
+      {files.length > 0 && !exceedMaxFiles && !files.every((f) => successes.includes(f.name)) && (
         <div className="mt-2">
           <Button
             variant="outline"

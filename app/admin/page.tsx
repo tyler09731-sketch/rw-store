@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const CARD_LEVELS = ['Standard', 'Silver', 'Gold', 'Platinum', 'Titanium', 'Signature', 'Infinite', 'World Elite', 'Business']
 const CARD_NETWORKS = ['Visa', 'Mastercard', 'Amex', 'Discover', 'JCB', 'UnionPay']
+const IMAGE_BUCKET = 'product-images'
+const IMAGE_PREFIX = 'bank-logos'
 
 export default function AdminPage() {
   const [password, setPassword] = useState('')
@@ -25,13 +27,13 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'users' | 'topups' | 'vault' | 'crypto' | 'settings'>('inventory')
-  
+
   const [balanceInputs, setBalanceInputs] = useState<Record<number, string>>({})
   const [savedUserId, setSavedUserId] = useState<number | null>(null)
 
   const [showCatForm, setShowCatForm] = useState(false)
   const [showProdForm, setShowProdForm] = useState(false)
-  
+
   const [newCatName, setNewCatName] = useState('')
   const [newCatView, setNewCatView] = useState('card')
   const [newCatFields, setNewCatFields] = useState<string[]>([''])
@@ -42,6 +44,7 @@ export default function AdminPage() {
   const [prodCategory, setProdCategory] = useState('')
   const [prodPrice, setProdPrice] = useState('')
   const [prodImage, setProdImage] = useState('')
+  const [originalImage, setOriginalImage] = useState('')
   const [prodFields, setProdFields] = useState<Record<string, string>>({})
   const [prodDeliveryInfo, setProdDeliveryInfo] = useState('')
   const [prodIsVault, setProdIsVault] = useState(false)
@@ -67,8 +70,8 @@ export default function AdminPage() {
   const hasStates = availableStates.length > 0
 
   const uploadProps = useSupabaseUpload({
-    bucketName: 'product-images',
-    path: 'bank-logos',
+    bucketName: IMAGE_BUCKET,
+    path: IMAGE_PREFIX,
     allowedMimeTypes: ['image/*'],
     maxFiles: 1,
     maxFileSize: 1000 * 1000 * 5,
@@ -83,14 +86,11 @@ export default function AdminPage() {
     }
   }, [uploadProps.files])
 
+  // Point prodImage at the NEWEST successful upload, not the first one.
   useEffect(() => {
-    if (uploadProps.isSuccess && uploadProps.successes.length > 0 && uploadProps.successes[0]) {
-      const supabase = createClient()
-      const fileName = uploadProps.successes[0]
-      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(`bank-logos/${fileName}`)
-      if (urlData?.publicUrl) setProdImage(urlData.publicUrl)
-    }
-  }, [uploadProps.isSuccess, uploadProps.successes])
+    const last = uploadProps.uploadedFiles[uploadProps.uploadedFiles.length - 1]
+    if (last?.publicUrl) setProdImage(last.publicUrl)
+  }, [uploadProps.uploadedFiles])
 
   useEffect(() => {
     const saved = localStorage.getItem('rw_admin_pw')
@@ -205,22 +205,55 @@ export default function AdminPage() {
   }
 
   const resetForm = () => {
-    setEditId(null); setProdTitle(''); setProdPrice(''); setProdImage(''); setProdFields({}); setProdDeliveryInfo(''); setProdIsVault(false); setSelectedCountryCode(''); setShowProdForm(false); uploadProps.setFiles([]); setLocalPreview(null)
+    setEditId(null); setProdTitle(''); setProdPrice(''); setProdImage(''); setOriginalImage(''); setProdFields({}); setProdDeliveryInfo(''); setProdIsVault(false); setSelectedCountryCode(''); setShowProdForm(false)
+    uploadProps.reset()
+    setLocalPreview(null)
   }
 
   const handleEditClick = (product: any) => {
-    setEditId(product.id); setProdTitle(product.title); setProdCategory(product.category); setProdPrice(product.price_usd.toString()); setProdImage(product.image_url || ''); setProdFields(product.metadata || {}); setProdDeliveryInfo(product.delivery_info || ''); setProdIsVault(product.is_vault_only || false); setSelectedCountryCode(product.metadata?.Country || ''); setShowProdForm(true); setLocalPreview(null); window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Wipe the uploader FIRST so nothing from the previous product leaks in.
+    uploadProps.reset()
+    setLocalPreview(null)
+
+    setEditId(product.id)
+    setProdTitle(product.title)
+    setProdCategory(product.category)
+    setProdPrice(product.price_usd.toString())
+    setProdImage(product.image_url || '')
+    setOriginalImage(product.image_url || '')
+    setProdFields(product.metadata || {})
+    setProdDeliveryInfo(product.delivery_info || '')
+    setProdIsVault(product.is_vault_only || false)
+    setSelectedCountryCode(product.metadata?.Country || '')
+    setShowProdForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const deleteStorageImage = async (publicUrl: string) => {
+    if (!publicUrl) return
+    const marker = `/object/public/${IMAGE_BUCKET}/`
+    const idx = publicUrl.indexOf(marker)
+    if (idx === -1) return
+    const objectPath = publicUrl.slice(idx + marker.length)
+    try {
+      await createClient().storage.from(IMAGE_BUCKET).remove([objectPath])
+    } catch {
+      // orphaned object is not fatal
+    }
   }
 
   const handleSaveProduct = async () => {
+    if (uploadProps.loading) { toast.error('Wait for the image to finish uploading'); return }
+
     const finalMetadata = { ...prodFields }
     if (selectedCountryCode) finalMetadata['Country'] = selectedCountryCode
     const payload = { password, title: prodTitle, category: prodCategory, price_usd: prodPrice, image_url: prodImage, metadata: finalMetadata, delivery_info: prodDeliveryInfo, is_vault_only: prodIsVault }
-    
+
     if (editId) {
       const res = await fetch('/api/admin/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, id: editId }) })
       if (res.ok) {
         toast.success('Product updated')
+        if (originalImage && originalImage !== prodImage) deleteStorageImage(originalImage)
         resetForm()
         fetchData()
       } else {
@@ -332,7 +365,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans pb-20">
       <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-4">
-        
+
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2">
             <ShieldAlert className="text-orange-500" size={24} />
@@ -370,7 +403,7 @@ export default function AdminPage() {
           <div className="space-y-4">
             <div className="flex gap-2">
               <button onClick={() => setShowCatForm(!showCatForm)} className="flex-1 flex items-center justify-center gap-2 text-xs md:text-sm font-semibold bg-gray-800 border border-gray-700 text-white px-3 py-2.5 rounded-lg hover:bg-gray-700 transition-colors"><Layers size={14} /> Category</button>
-              <button onClick={() => { resetForm(); setShowProdForm(!showProdForm); }} className="flex-1 flex items-center justify-center gap-2 text-xs md:text-sm font-semibold bg-orange-500 text-white px-3 py-2.5 rounded-lg hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><Plus size={14} /> Product</button>
+              <button onClick={() => { resetForm(); setShowProdForm(true) }} className="flex-1 flex items-center justify-center gap-2 text-xs md:text-sm font-semibold bg-orange-500 text-white px-3 py-2.5 rounded-lg hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><Plus size={14} /> Product</button>
             </div>
 
             {showCatForm && (
@@ -404,16 +437,16 @@ export default function AdminPage() {
                   <h2 className="font-bold text-white">{editId ? 'Edit Product' : 'New Product'}</h2>
                   {editId && <button onClick={resetForm} className="text-xs text-red-400 font-semibold">Cancel</button>}
                 </div>
-                
+
                 <input placeholder="Title" value={prodTitle} onChange={e => setProdTitle(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                
+
                 <select value={prodCategory} onChange={e => {setProdCategory(e.target.value); if (!editId) setProdFields({}); setSelectedCountryCode('')}} disabled={!!editId} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-orange-500">
                   <option value="">Select Category</option>
                   {data.schemas.map((s: any) => <option key={s.category} value={s.category}>{s.category}</option>)}
                 </select>
-                
+
                 <input placeholder="Price USD" type="number" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full bg-gray-700 border border-gray-600 text-white p-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                
+
                 {selectedSchema?.has_image && (
                   <div>
                     <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Product Image</p>
@@ -421,8 +454,9 @@ export default function AdminPage() {
                       <img src={localPreview || prodImage} alt="Preview" className="w-20 h-20 rounded-lg object-cover mb-3 border border-gray-600" />
                     )}
                     <Dropzone {...uploadProps}>
-                      {uploadProps.isSuccess ? <DropzoneContent /> : <DropzoneEmptyState />}
+                      {uploadProps.files.length > 0 || uploadProps.isSuccess ? <DropzoneContent /> : <DropzoneEmptyState />}
                     </Dropzone>
+                    {uploadProps.loading && <p className="text-[10px] text-orange-400 mt-1">Uploading, hold on before saving...</p>}
                   </div>
                 )}
 
@@ -496,8 +530,8 @@ export default function AdminPage() {
                   <Vault size={14} className="text-orange-400" />
                   <span className="text-xs font-medium text-gray-200">Vault Only (exclusive to VIP / trusted buyers)</span>
                 </label>
-                
-                <button onClick={handleSaveProduct} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">{editId ? 'Update Product' : 'Save Product'}</button>
+
+                <button onClick={handleSaveProduct} disabled={uploadProps.loading} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20 disabled:opacity-50">{uploadProps.loading ? 'Uploading image...' : editId ? 'Update Product' : 'Save Product'}</button>
               </div>
             )}
 

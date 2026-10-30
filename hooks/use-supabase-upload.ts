@@ -10,6 +10,8 @@ interface FileWithPreview extends File {
   errors: readonly FileError[]
 }
 
+type UploadedFile = { name: string; path: string; publicUrl: string }
+
 type UseSupabaseUploadOptions = {
   bucketName: string
   path?: string
@@ -29,7 +31,7 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
     allowedMimeTypes = [],
     maxFileSize = Number.POSITIVE_INFINITY,
     maxFiles = 1,
-    cacheControl = 3600,
+    cacheControl = 0,
     upsert = false,
   } = options
 
@@ -37,37 +39,67 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
   const [loading, setLoading] = useState<boolean>(false)
   const [errors, setErrors] = useState<{ name: string; message: string }[]>([])
   const [successes, setSuccesses] = useState<string[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const uploadInProgress = useRef(false)
   const attemptedUploads = useRef<Set<string>>(new Set())
 
+  // Only true when every file in the current batch is genuinely uploaded.
   const isSuccess = useMemo(() => {
-    if (errors.length === 0 && successes.length === 0) return false
-    if (errors.length === 0 && successes.length === files.length) return true
-    return false
-  }, [errors.length, successes.length, files.length])
+    if (files.length === 0) return false
+    return files.every((f) => f.errors.length === 0 && successes.includes(f.name))
+  }, [files, successes])
+
+  const reset = useCallback(() => {
+    setFiles((prev) => {
+      prev.forEach((f) => {
+        if (f.preview) URL.revokeObjectURL(f.preview)
+      })
+      return []
+    })
+    setErrors([])
+    setSuccesses([])
+    setUploadedFiles([])
+    attemptedUploads.current.clear()
+  }, [])
 
   const onDrop = useCallback(
     (acceptedFiles: File[], fileRejections: FileRejection[]) => {
-      const validFiles = acceptedFiles
-        .filter((file) => !files.find((x) => x.name === file.name))
-        .map((file) => {
+      const incoming: FileWithPreview[] = [
+        ...acceptedFiles.map((file) => {
           const fileWithPreview = file as unknown as FileWithPreview
           fileWithPreview.preview = URL.createObjectURL(file)
           fileWithPreview.errors = []
           return fileWithPreview
-        })
+        }),
+        ...fileRejections.map(({ file, errors }) => {
+          const fileWithPreview = file as unknown as FileWithPreview
+          fileWithPreview.preview = URL.createObjectURL(file)
+          fileWithPreview.errors = errors
+          return fileWithPreview
+        }),
+      ]
 
-      const invalidFiles = fileRejections.map(({ file, errors }) => {
-        const fileWithPreview = file as unknown as FileWithPreview
-        fileWithPreview.preview = URL.createObjectURL(file)
-        fileWithPreview.errors = errors
-        return fileWithPreview
+      setFiles((prev) => {
+        const merged = maxFiles === 1 ? incoming.slice(-1) : [...prev, ...incoming]
+        const deduped = merged.filter(
+          (f, i, arr) => arr.findIndex((x) => x.name === f.name) === i
+        )
+        prev.forEach((p) => {
+          if (!deduped.includes(p) && p.preview) URL.revokeObjectURL(p.preview)
+        })
+        return deduped
       })
 
-      const newFiles = [...files, ...validFiles, ...invalidFiles]
-      setFiles(newFiles)
+      // A replacement is a fresh batch. Clear stale bookkeeping so re-picking
+      // the same filename still results in a real upload.
+      if (maxFiles === 1) {
+        setErrors([])
+        setSuccesses([])
+        setUploadedFiles([])
+        attemptedUploads.current.clear()
+      }
     },
-    [files, setFiles]
+    [maxFiles]
   )
 
   const dropzoneProps = useDropzone({
@@ -79,92 +111,105 @@ const useSupabaseUpload = (options: UseSupabaseUploadOptions) => {
     multiple: maxFiles !== 1,
   })
 
+  const storageKeyFor = (file: File) => {
+    const ext = file.name.includes('.') ? `.${file.name.split('.').pop()}` : ''
+    const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}${ext}`
+    return path ? `${path}/${key}` : key
+  }
+
   const onUpload = useCallback(async () => {
+    if (uploadInProgress.current) return
+    uploadInProgress.current = true
     setLoading(true)
 
-    const filesWithErrors = errors.map((x) => x.name)
-    const filesToUpload =
-      filesWithErrors.length > 0
-        ? [
-            ...files.filter((f) => filesWithErrors.includes(f.name)),
-            ...files.filter((f) => !successes.includes(f.name)),
-          ]
-        : files
+    try {
+      const pending = files.filter(
+        (f) => f.errors.length === 0 && !successes.includes(f.name)
+      )
 
-    const responses = await Promise.all(
-      filesToUpload.map(async (file) => {
-        const { error } = await supabase.storage
-          .from(bucketName)
-          .upload(!!path ? `${path}/${file.name}` : file.name, file, {
-            cacheControl: cacheControl.toString(),
-            upsert,
-          })
-        if (error) {
-          return { name: file.name, message: error.message }
-        } else {
-          return { name: file.name, message: undefined }
-        }
-      })
-    )
+      const responses = await Promise.all(
+        pending.map(async (file) => {
+          const key = storageKeyFor(file)
+          const { error } = await supabase.storage
+            .from(bucketName)
+            .upload(key, file, {
+              cacheControl: cacheControl.toString(),
+              upsert,
+            })
 
-    const responseErrors = responses.filter((x) => x.message !== undefined)
-    setErrors(responseErrors)
+          if (error) {
+            return { name: file.name, message: error.message, path: null, publicUrl: null }
+          }
 
-    const responseSuccesses = responses.filter((x) => x.message === undefined)
-    const newSuccesses = Array.from(
-      new Set([...successes, ...responseSuccesses.map((x) => x.name)])
-    )
-    setSuccesses(newSuccesses)
+          const { data } = supabase.storage.from(bucketName).getPublicUrl(key)
+          return { name: file.name, message: undefined, path: key, publicUrl: data.publicUrl }
+        })
+      )
 
-    setLoading(false)
-  }, [files, path, bucketName, errors, successes])
+      const failed = responses.filter((r) => r.message !== undefined)
+      const succeeded = responses.filter((r) => !!r.path && !!r.publicUrl)
+
+      if (failed.length > 0) {
+        setErrors((prev) => [
+          ...prev.filter((e) => !failed.some((f) => f.name === e.name)),
+          ...failed.map((f) => ({ name: f.name, message: f.message as string })),
+        ])
+        // Allow the auto-uploader to retry these.
+        failed.forEach((f) => attemptedUploads.current.delete(f.name))
+      }
+
+      if (succeeded.length > 0) {
+        setSuccesses((prev) =>
+          Array.from(new Set([...prev, ...succeeded.map((r) => r.name)]))
+        )
+        setUploadedFiles((prev) => [
+          ...prev,
+          ...succeeded.map((r) => ({
+            name: r.name,
+            path: r.path as string,
+            publicUrl: r.publicUrl as string,
+          })),
+        ])
+      }
+    } finally {
+      setLoading(false)
+      uploadInProgress.current = false
+    }
+  }, [files, path, bucketName, successes, cacheControl, upsert])
 
   // AUTO-UPLOAD with retry prevention
   useEffect(() => {
     const hasNewFiles = files.some(
-      (f) => f.errors.length === 0 && !successes.includes(f.name) && !attemptedUploads.current.has(f.name)
+      (f) =>
+        f.errors.length === 0 &&
+        !successes.includes(f.name) &&
+        !attemptedUploads.current.has(f.name)
     )
     if (hasNewFiles && !loading && !uploadInProgress.current) {
-      uploadInProgress.current = true
       files.forEach((f) => {
         if (!successes.includes(f.name) && f.errors.length === 0) {
           attemptedUploads.current.add(f.name)
         }
       })
-      onUpload().finally(() => {
-        uploadInProgress.current = false
-      })
+      onUpload()
     }
   }, [files, onUpload, loading, successes])
 
   useEffect(() => {
-    if (files.length === 0) {
-      setErrors([])
-      attemptedUploads.current.clear()
-    }
-
-    if (files.length <= maxFiles) {
-      let changed = false
-      const newFiles = files.map((file) => {
-        if (file.errors.some((e) => e.code === 'too-many-files')) {
-          file.errors = file.errors.filter((e) => e.code !== 'too-many-files')
-          changed = true
-        }
-        return file
-      })
-      if (changed) setFiles(newFiles)
-    }
-  }, [files.length, setFiles, maxFiles])
+    if (files.length === 0) setErrors([])
+  }, [files.length])
 
   return {
     files,
     setFiles,
     successes,
+    uploadedFiles,
     isSuccess,
     loading,
     errors,
     setErrors,
     onUpload,
+    reset,
     maxFileSize: maxFileSize,
     maxFiles: maxFiles,
     allowedMimeTypes,
